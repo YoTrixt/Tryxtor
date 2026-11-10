@@ -61,7 +61,7 @@ public partial class MainWindow : Window
     static readonly object browserEnvironmentLock = new();
     static Task<CoreWebView2Environment>? browserEnvironmentTask;
     static readonly string browserUserDataFolder = System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Trixter", "WebView2");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tryxtor", "WebView2");
     static readonly SemaphoreSlim uBlockImportGate = new(1, 1);
     static bool uBlockImportAttempted;
     const string UBlockExtensionId = "cjpalhdlnbpafiamejdnhcphjbkeiagm";
@@ -134,7 +134,7 @@ public partial class MainWindow : Window
     }
 
     readonly List<BrowserTab> tabs = new();
-    readonly string settingsPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Trixter", "settings.json");
+    readonly string settingsPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tryxtor", "settings.json");
     Preferences preferences = new();
     readonly bool privateMode;
     string? privateProfilePath;
@@ -195,10 +195,10 @@ public partial class MainWindow : Window
         };
         if (privateMode)
         {
-            Title = "Trixter — Incognito";
+            Title = "Tryxtor — Incognito";
             BrandLabel.Text = "TRIXTER  ·  INCOGNITO";
             BrandLabel.Foreground = new SolidColorBrush(Color.FromRgb(190, 164, 255));
-            privateProfilePath = sharedPrivateProfilePath ?? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Trixter-InPrivate-" + Guid.NewGuid().ToString("N"));
+            privateProfilePath = sharedPrivateProfilePath ?? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Tryxtor-InPrivate-" + Guid.NewGuid().ToString("N"));
             Closed += (_, _) =>
             {
                 // Delete the shared incognito profile only after its final window closes.
@@ -541,8 +541,8 @@ public partial class MainWindow : Window
         if (!IsWebView2RuntimeMissing(exception))
         {
             MessageBox.Show(
-                "Trixter couldn't start WebView2.\n\n" + exception.Message,
-                "Trixter Browser Startup",
+                "Tryxtor couldn't start WebView2.\n\n" + exception.Message,
+                "Tryxtor Browser Startup",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             return;
@@ -556,7 +556,7 @@ public partial class MainWindow : Window
             FontSize = 14
         };
         message.Inlines.Add(new System.Windows.Documents.Run(
-            "Trixter needs the Microsoft Edge WebView2 Evergreen Runtime to display web pages. It isn't installed on this computer.\n\n"));
+            "Tryxtor needs the Microsoft Edge WebView2 Evergreen Runtime to display web pages. It isn't installed on this computer.\n\n"));
         var downloadLink = new System.Windows.Documents.Hyperlink(
             new System.Windows.Documents.Run("Download the WebView2 Runtime from Microsoft"))
         {
@@ -619,7 +619,7 @@ public partial class MainWindow : Window
             System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(settingsPath)!);
             System.IO.File.WriteAllText(settingsPath, JsonSerializer.Serialize(preferences));
         }
-        catch (Exception ex) { MessageBox.Show("Could not save settings: " + ex.Message, "Trixter"); }
+        catch (Exception ex) { MessageBox.Show("Could not save settings: " + ex.Message, "Tryxtor"); }
     }
 
     void ApplyAppearance()
@@ -880,7 +880,7 @@ public partial class MainWindow : Window
                         var accounts = owner.passwordVault.GetEntriesForWebsite(sourceOrigin);
 
                         System.Diagnostics.Debug.WriteLine(
-                            $"[Trixter Password Manager] Found {accounts.Count} saved account(s) for {sourceOrigin}");
+                            $"[Tryxtor Password Manager] Found {accounts.Count} saved account(s) for {sourceOrigin}");
                     }
                     else if (receivedMessage == "trixter:show-password-menu" && !owner.privateMode)
                     {
@@ -969,10 +969,12 @@ public partial class MainWindow : Window
             ShowWebView2InitializationError(ex);
             return false;
         }
+        tab.View.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
+        tab.View.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
         if (!tab.Owner.privateMode && tab.View.CoreWebView2 != null)
         {
             try { await ImportOperaUBlockAsync(tab.View.CoreWebView2.Profile); }
-            catch (Exception ex) { MessageBox.Show("Trixter found uBlock Origin in Opera GX but could not load it.\n\n" + ex.Message, "Trixter Extensions", MessageBoxButton.OK, MessageBoxImage.Warning); }
+            catch (Exception ex) { MessageBox.Show("Tryxtor found uBlock Origin in Opera GX but could not load it.\n\n" + ex.Message, "Tryxtor Extensions", MessageBoxButton.OK, MessageBoxImage.Warning); }
         }
         ActivateTab(tab);
         var target = string.IsNullOrWhiteSpace(address) ? preferences.HomePage : address;
@@ -1104,7 +1106,7 @@ public partial class MainWindow : Window
             string version = System.IO.Path.GetFileName(source);
             string managedFolder = System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Trixter", "Extensions", "uBlockOrigin-" + version);
+                "Tryxtor", "Extensions", "uBlockOrigin-" + version);
             if (!System.IO.Directory.Exists(managedFolder)) CopyExtensionDirectory(source, managedFolder);
             await profile.AddBrowserExtensionAsync(managedFolder);
         }
@@ -1145,12 +1147,12 @@ public partial class MainWindow : Window
         {
             activeTab = null;
 
-            // Keep a blank start tab only when this is the last Trixter window.
-            bool anotherTrixterWindowIsOpen = Application.Current.Windows
+            // Keep a blank start tab only when this is the last Tryxtor window.
+            bool anotherTryxtorWindowIsOpen = Application.Current.Windows
                 .OfType<MainWindow>()
                 .Any(window => window != this);
 
-            if (anotherTrixterWindowIsOpen)
+            if (anotherTryxtorWindowIsOpen)
                 Close();
             else
                 _ = AddTab();
@@ -1371,7 +1373,7 @@ public partial class MainWindow : Window
     {
         if (privateMode)
         {
-            MessageBox.Show("History is not available in this incognito window.", "Trixter Incognito", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("History is not available in this incognito window.", "Tryxtor Incognito", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
         var dialog = new Window { Title = "Browsing history", Owner = this, Width = 600, Height = 680, MinWidth = 480, WindowStartupLocation = WindowStartupLocation.CenterOwner, Background = new SolidColorBrush(Color.FromRgb(17, 20, 27)), Foreground = new SolidColorBrush(Color.FromRgb(239, 242, 247)) };
@@ -1427,7 +1429,7 @@ public partial class MainWindow : Window
         var profile = activeTab?.View.CoreWebView2?.Profile;
         if (profile == null)
         {
-            MessageBox.Show("Wait for a page or new tab to finish opening, then open Extensions again.", "Trixter Extensions");
+            MessageBox.Show("Wait for a page or new tab to finish opening, then open Extensions again.", "Tryxtor Extensions");
             return;
         }
 
@@ -1465,7 +1467,7 @@ public partial class MainWindow : Window
                 {
                     if (remove.Tag is not CoreWebView2BrowserExtension current) return;
                     try { await current.RemoveAsync(); await RefreshExtensions(); }
-                    catch (Exception ex) { MessageBox.Show("Could not remove the extension: " + ex.Message, "Trixter Extensions"); }
+                    catch (Exception ex) { MessageBox.Show("Could not remove the extension: " + ex.Message, "Tryxtor Extensions"); }
                 };
                 DockPanel.SetDock(remove, Dock.Right); row.Children.Add(remove);
                 var enabled = new CheckBox { Content = extension.Name, IsChecked = extension.IsEnabled, Tag = extension, Foreground = ink, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 8, 5, 8), FontWeight = FontWeights.SemiBold };
@@ -1480,7 +1482,7 @@ public partial class MainWindow : Window
         async Task SetExtensionEnabled(CoreWebView2BrowserExtension extension, bool enabled)
         {
             try { await extension.EnableAsync(enabled); }
-            catch (Exception ex) { MessageBox.Show("Could not update the extension: " + ex.Message, "Trixter Extensions"); }
+            catch (Exception ex) { MessageBox.Show("Could not update the extension: " + ex.Message, "Tryxtor Extensions"); }
         }
 
         install.Click += async (_, _) =>
@@ -1493,9 +1495,9 @@ public partial class MainWindow : Window
             {
                 var added = await profile.AddBrowserExtensionAsync(folder);
                 await RefreshExtensions();
-                MessageBox.Show($"{added.Name} was added to this Trixter profile.", "Trixter Extensions", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"{added.Name} was added to this Tryxtor profile.", "Tryxtor Extensions", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-            catch (Exception ex) { MessageBox.Show("Could not install this extension. Choose its unpacked folder containing manifest.json.\n\n" + ex.Message, "Trixter Extensions", MessageBoxButton.OK, MessageBoxImage.Warning); }
+            catch (Exception ex) { MessageBox.Show("Could not install this extension. Choose its unpacked folder containing manifest.json.\n\n" + ex.Message, "Tryxtor Extensions", MessageBoxButton.OK, MessageBoxImage.Warning); }
         };
 
         dialog.Content = layout;
@@ -1660,7 +1662,7 @@ public partial class MainWindow : Window
         var layout = new Grid(); layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); layout.RowDefinitions.Add(new RowDefinition()); layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var heading = new StackPanel { Margin = new Thickness(26, 22, 26, 18) };
         heading.Children.Add(new TextBlock { Text = "Settings", FontSize = 25, FontWeight = FontWeights.SemiBold, Foreground = ink });
-        heading.Children.Add(new TextBlock { Text = "Shape Trixter around the way you browse.", FontSize = 12, Foreground = muted, Margin = new Thickness(0, 4, 0, 0) });
+        heading.Children.Add(new TextBlock { Text = "Shape Tryxtor around the way you browse.", FontSize = 12, Foreground = muted, Margin = new Thickness(0, 4, 0, 0) });
         layout.Children.Add(heading);
 
         var appearanceContent = new StackPanel();
@@ -1799,7 +1801,7 @@ public partial class MainWindow : Window
                 suggestionCheck,
                 SettingLabel("BACKGROUND IMAGE", muted),
                 backgroundControls,
-                SettingLabel("Homepage (blank uses Trixter start page)", muted),
+                SettingLabel("Homepage (blank uses Tryxtor start page)", muted),
                 home,
                 SettingLabel("Search URL template (include {query})", muted),
                 search
@@ -1876,7 +1878,7 @@ public partial class MainWindow : Window
                 if (string.IsNullOrWhiteSpace(nameInput.Text) ||
                     string.IsNullOrWhiteSpace(urlInput.Text))
                 {
-                    MessageBox.Show(editDialog, "Both the name and URL are required.", "Trixter Settings",
+                    MessageBox.Show(editDialog, "Both the name and URL are required.", "Tryxtor Settings",
                         MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }

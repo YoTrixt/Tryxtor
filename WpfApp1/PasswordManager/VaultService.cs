@@ -9,7 +9,7 @@ public class VaultService
     private readonly string vaultDirectory =
         Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Trixter",
+            "Tryxtor",
             "PasswordManager");
 
     private readonly string vaultPath;
