@@ -1,7 +1,7 @@
-#define MyAppName "Trixter"
-#define MyAppVersion "1.2.0"
-#define MyAppPublisher "Trixter"
-#define MyAppExeName "Trixter.exe"
+#define MyAppName "Tryxtor"
+#define MyAppVersion "1.2.5"
+#define MyAppPublisher "Tryxtor"
+#define MyAppExeName "Tryxtor.exe"
 
 [Setup]
 AppId={{25A59C34-1364-4F35-97C3-4F122A3CCCE9}
@@ -9,20 +9,20 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
-DefaultDirName={localappdata}\Programs\Trixter
-DefaultGroupName=Trixter
+DefaultDirName={localappdata}\Programs\Tryxtor
+DefaultGroupName=Tryxtor
 DisableProgramGroupPage=yes
 MinVersion=10.0.22000
 Uninstallable=yes
 CreateUninstallRegKey=yes
-UninstallDisplayName=Trixter
-UninstallDisplayIcon={app}\Trixter.exe
+UninstallDisplayName=Tryxtor
+UninstallDisplayIcon={app}\Tryxtor.exe
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
-VersionInfoVersion=1.2.0.0
+VersionInfoVersion=1.2.5.0
 OutputDir=installer-output
-OutputBaseFilename=TrixterSetup-1.2.0-x64
+OutputBaseFilename=TryxtorSetup-1.2.5-x64
 SetupLogging=yes
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
@@ -32,6 +32,7 @@ RestartApplications=no
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=Tryxtor.ico
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
@@ -39,11 +40,11 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 [Files]
 ; The publish folder currently contains local WebView2 profile folders from development runs.
 ; Exclude them so browser data is never shipped or installed into Program Files.
-Source: "publish\*"; DestDir: "{app}"; Excludes: "\Trixter.exe.WebView2\*,\WpfApp1.exe.WebView2\*"; Flags: ignoreversion recursesubdirs
+Source: "publish\*"; DestDir: "{app}"; Excludes: "\Tryxtor.exe.WebView2\*,\WpfApp1.exe.WebView2\*"; Flags: ignoreversion recursesubdirs
 
 [Icons]
-Name: "{autoprograms}\Trixter"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\Trixter"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\Tryxtor"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\Tryxtor"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Code]
 const
@@ -78,11 +79,11 @@ end;
 function AskToContinueWithoutRuntime(const FailureDetails: String): Boolean;
 begin
   Result := MsgBox(
-    'Trixter could not install the Microsoft Edge WebView2 Evergreen Runtime.' + #13#10 + #13#10 +
+    'Tryxtor could not install the Microsoft Edge WebView2 Evergreen Runtime.' + #13#10 + #13#10 +
     FailureDetails + #13#10 + #13#10 +
-    'You can continue installing Trixter, but web pages may not work until the Runtime is installed. ' +
+    'You can continue installing Tryxtor, but web pages may not work until the Runtime is installed. ' +
     'You can download it later from:' + #13#10 + WebView2RuntimeDownloadUrl + #13#10 + #13#10 +
-    'Continue installing Trixter anyway?',
+    'Continue installing Tryxtor anyway?',
     mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES;
 end;
 
@@ -137,7 +138,7 @@ begin
   if RuntimeFailure <> '' then
   begin
     if WizardSilent or not AskToContinueWithoutRuntime(RuntimeFailure) then
-      Result := 'Trixter setup was canceled because the WebView2 Runtime could not be installed.';
+      Result := 'Tryxtor setup was canceled because the WebView2 Runtime could not be installed.';
   end;
 end;
 
@@ -145,7 +146,7 @@ procedure InitializeWizard;
 begin
   WebView2DownloadPage := CreateDownloadPage(
     'Microsoft Edge WebView2 Runtime',
-    'The WebView2 Evergreen Runtime is required by Trixter. Downloading the official Microsoft x64 standalone installer...',
+    'The WebView2 Evergreen Runtime is required by Tryxtor. Downloading the official Microsoft x64 standalone installer...',
     nil);
   WebView2DownloadPage.ShowBaseNameInsteadOfUrl := True;
 end;

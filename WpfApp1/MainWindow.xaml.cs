@@ -361,24 +361,22 @@ public partial class MainWindow : Window
 
     void ShowPasswordAccountMenu(BrowserTab tab, List<VaultEntry> accounts)
     {
-        if (privateMode || accounts.Count == 0)
+        if (tab.Owner.privateMode)
             return;
 
-        if (passwordAccountPopup?.IsOpen == true)
-            return; 
+        if (tab.Owner.passwordAccountPopup?.IsOpen == true)
+            return;
 
-        bool light = preferences.Theme == "Light";
+        bool light = tab.Owner.preferences.Theme == "Light";
+        bool isLocked = !tab.Owner.passwordVault.IsUnlocked;
 
         var background = new SolidColorBrush(
             light ? Color.FromRgb(255, 255, 255) : Color.FromRgb(30, 34, 43));
-
         var foreground = new SolidColorBrush(
             light ? Color.FromRgb(35, 42, 53) : Color.FromRgb(239, 242, 247));
-
         var muted = new SolidColorBrush(
             light ? Color.FromRgb(110, 120, 135) : Color.FromRgb(155, 165, 180));
-
-        var accent = ParseBrush(preferences.Accent, Brushes.LightGreen);
+        var accent = ParseBrush(tab.Owner.preferences.Accent, Brushes.LightGreen);
 
         var border = new Border
         {
@@ -402,7 +400,7 @@ public partial class MainWindow : Window
 
         panel.Children.Add(new TextBlock
         {
-            Text = "TRIXTER PASSWORDS",
+            Text = "TRYXTOR PASSWORDS",
             FontSize = 10,
             FontWeight = FontWeights.Bold,
             Foreground = muted,
@@ -417,7 +415,66 @@ public partial class MainWindow : Window
             AllowsTransparency = true,
             StaysOpen = true
         };
-        passwordAccountPopup = popup;
+        tab.Owner.passwordAccountPopup = popup;
+        popup.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(tab.Owner.passwordAccountPopup, popup))
+                tab.Owner.passwordAccountPopup = null;
+        };
+
+        if (isLocked)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = tab.Owner.passwordVault.VaultExists()
+                    ? "Your password vault is locked."
+                    : "Create a vault to start saving passwords.",
+                FontSize = 12,
+                Foreground = foreground,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(10, 2, 10, 10)
+            });
+
+            var unlockButton = new Button
+            {
+                Content = tab.Owner.passwordVault.VaultExists()
+                    ? "Unlock vault"
+                    : "Create vault",
+                Background = accent,
+                Foreground = light ? Brushes.White : Brushes.Black,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(12, 8, 12, 8),
+                Margin = new Thickness(8, 0, 8, 4),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Cursor = Cursors.Hand,
+                FontWeight = FontWeights.SemiBold
+            };
+
+            unlockButton.Click += (_, _) =>
+            {
+                popup.IsOpen = false;
+
+                if (tab.Owner.PromptToUnlockVault())
+                {
+                    var refreshedAccounts =
+                        tab.Owner.passwordVault.GetEntriesForWebsite(tab.Url);
+
+                    tab.Owner.ShowPasswordAccountMenu(tab, refreshedAccounts);
+                }
+            };
+
+            panel.Children.Add(unlockButton);
+        }
+        else if (accounts.Count == 0)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = "No saved accounts for this website.",
+                FontSize = 12,
+                Foreground = muted,
+                Margin = new Thickness(10, 2, 10, 10)
+            });
+        }
 
         foreach (var account in accounts)
         {
@@ -431,7 +488,6 @@ public partial class MainWindow : Window
             };
 
             var accountPanel = new StackPanel();
-
             accountPanel.Children.Add(new TextBlock
             {
                 Text = account.Username,
@@ -439,7 +495,6 @@ public partial class MainWindow : Window
                 FontWeight = FontWeights.SemiBold,
                 Foreground = foreground
             });
-
             accountPanel.Children.Add(new TextBlock
             {
                 Text = account.Website,
@@ -447,82 +502,52 @@ public partial class MainWindow : Window
                 Foreground = muted,
                 Margin = new Thickness(0, 3, 0, 0)
             });
-
             button.Content = accountPanel;
 
             button.MouseEnter += (_, _) =>
-            {
                 button.Background = new SolidColorBrush(
                     light ? Color.FromRgb(238, 243, 249) : Color.FromRgb(48, 56, 69));
-            };
-
-            button.MouseLeave += (_, _) =>
-            {
-                button.Background = Brushes.Transparent;
-            };
+            button.MouseLeave += (_, _) => button.Background = Brushes.Transparent;
 
             button.Click += async (_, _) =>
             {
                 popup.IsOpen = false;
-                if (!Uri.TryCreate(tab.Url, UriKind.Absolute, out var currentUri))
+
+                if (!tab.Owner.passwordVault.IsUnlocked ||
+                    !Uri.TryCreate(tab.Url, UriKind.Absolute, out var currentUri))
                     return;
 
-                string currentOrigin =
-                    currentUri.GetLeftPart(UriPartial.Authority);
-
+                string currentOrigin = currentUri.GetLeftPart(UriPartial.Authority);
                 if (!string.Equals(
                     currentOrigin,
                     account.Website.TrimEnd('/'),
                     StringComparison.OrdinalIgnoreCase))
                     return;
 
-                string usernameJson =
-                    JsonSerializer.Serialize(account.Username);
-
-                string passwordJson =
-                    JsonSerializer.Serialize(account.Password);
+                string usernameJson = JsonSerializer.Serialize(account.Username);
+                string passwordJson = JsonSerializer.Serialize(account.Password);
 
                 string script = $$"""
                 (() => {
-                    const password = document.querySelector(
-                        'input[type="password"]'
-                    );
-
+                    const password = document.querySelector('input[type="password"]');
                     if (!password) return;
 
                     const form = password.form || document;
-
-                    const username = Array.from(
-                        form.querySelectorAll('input')
-                    ).find(input =>
+                    const username = Array.from(form.querySelectorAll('input')).find(input =>
                         input !== password &&
-                        (
-                            input.autocomplete === 'username' ||
-                            input.type === 'email' ||
-                            input.type === 'text'
-                        )
-                    );
+                        (input.autocomplete === 'username' ||
+                         input.type === 'email' ||
+                         input.type === 'text'));
 
                     function fill(input, value) {
                         const setter = Object.getOwnPropertyDescriptor(
-                            HTMLInputElement.prototype,
-                            'value'
-                        ).set;
-
+                            HTMLInputElement.prototype, 'value').set;
                         setter.call(input, value);
-
-                        input.dispatchEvent(
-                            new Event('input', { bubbles: true })
-                        );
-
-                        input.dispatchEvent(
-                            new Event('change', { bubbles: true })
-                        );
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
                     }
 
-                    if (username)
-                        fill(username, {{usernameJson}});
-
+                    if (username) fill(username, {{usernameJson}});
                     fill(password, {{passwordJson}});
                 })();
                 """;
@@ -534,6 +559,108 @@ public partial class MainWindow : Window
         }
 
         popup.IsOpen = true;
+    }
+
+    bool PromptToUnlockVault()
+    {
+        bool light = preferences.Theme == "Light";
+        var dialog = new Window
+        {
+            Title = passwordVault.VaultExists() ? "Unlock Tryxtor" : "Create Tryxtor vault",
+            Owner = this,
+            Width = 390,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            Background = new SolidColorBrush(
+                light ? Color.FromRgb(248, 249, 251) : Color.FromRgb(23, 26, 33)),
+            Foreground = new SolidColorBrush(
+                light ? Color.FromRgb(35, 42, 53) : Color.FromRgb(239, 242, 247))
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(22) };
+        panel.Children.Add(new TextBlock
+        {
+            Text = passwordVault.VaultExists()
+                ? "Enter your master password to access saved accounts."
+                : "Choose a master password to create your encrypted vault.",
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 0, 0, 14)
+        });
+
+        var passwordBox = new PasswordBox
+        {
+            Padding = new Thickness(10),
+            Background = new SolidColorBrush(
+                light ? Colors.White : Color.FromRgb(30, 36, 46)),
+            Foreground = dialog.Foreground,
+            BorderBrush = new SolidColorBrush(
+                light ? Color.FromRgb(202, 210, 221) : Color.FromRgb(55, 64, 77))
+        };
+        panel.Children.Add(passwordBox);
+
+        var errorText = new TextBlock
+        {
+            Foreground = Brushes.IndianRed,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        panel.Children.Add(errorText);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 16, 0, 0)
+        };
+
+        var cancelButton = new Button
+        {
+            Content = "Cancel",
+            Padding = new Thickness(14, 8, 14, 8),
+            Margin = new Thickness(0, 0, 8, 0),
+            IsCancel = true
+        };
+        var submitButton = new Button
+        {
+            Content = passwordVault.VaultExists() ? "Unlock" : "Create vault",
+            Padding = new Thickness(14, 8, 14, 8),
+            Background = ParseBrush(preferences.Accent, Brushes.LightGreen),
+            Foreground = light ? Brushes.White : Brushes.Black,
+            BorderThickness = new Thickness(0),
+            IsDefault = true
+        };
+
+        submitButton.Click += (_, _) =>
+        {
+            try
+            {
+                string masterPassword = passwordBox.Password;
+                if (passwordVault.VaultExists())
+                    passwordVault.Unlock(masterPassword);
+                else
+                    passwordVault.CreateVault(masterPassword);
+
+                passwordBox.Clear();
+                dialog.DialogResult = true;
+            }
+            catch (Exception ex)
+            {
+                errorText.Text = ex.Message;
+                passwordBox.Clear();
+                passwordBox.Focus();
+            }
+        };
+
+        buttons.Children.Add(cancelButton);
+        buttons.Children.Add(submitButton);
+        panel.Children.Add(buttons);
+        dialog.Content = panel;
+        dialog.Loaded += (_, _) => passwordBox.Focus();
+
+        bool? result = dialog.ShowDialog();
+        passwordBox.Clear();
+        return result == true && passwordVault.IsUnlocked;
     }
 
     void ShowWebView2InitializationError(Exception exception)
@@ -884,9 +1011,6 @@ public partial class MainWindow : Window
                     }
                     else if (receivedMessage == "trixter:show-password-menu" && !owner.privateMode)
                     {
-                        if (!owner.passwordVault.IsUnlocked)
-                            return;
-
                         if (!Uri.TryCreate(message.Source, UriKind.Absolute, out var sourceUri) ||
                             !Uri.TryCreate(tab.Url, UriKind.Absolute, out var tabUri))
                             return;
@@ -897,7 +1021,11 @@ public partial class MainWindow : Window
                             StringComparison.OrdinalIgnoreCase))
                             return;
 
-                        var accounts = owner.passwordVault.GetEntriesForWebsite(tab.Url);
+                        // When locked, show the locked-state prompt without exposing
+                        // usernames or passwords. Entries are read only after unlock.
+                        var accounts = owner.passwordVault.IsUnlocked
+                            ? owner.passwordVault.GetEntriesForWebsite(tab.Url)
+                            : new List<VaultEntry>();
 
                         owner.ShowPasswordAccountMenu(tab, accounts);
                     }
