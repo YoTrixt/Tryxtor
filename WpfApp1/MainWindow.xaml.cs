@@ -74,6 +74,9 @@ public partial class MainWindow : Window
         public MainWindow Owner = null!;
         public Button TitleButton = null!;
         public Border Surface = null!;
+        public string? PendingLoginOrigin;
+        public string? PendingLoginUsername;
+        public string? PendingLoginPassword;
     }
 
     sealed class Shortcut
@@ -104,11 +107,13 @@ public partial class MainWindow : Window
     }
     private VaultService passwordVault = new();
     private Popup? passwordAccountPopup;
+    private Window? passwordSavePopup;
     private bool closeCornerPressed;
     sealed class Preferences
     {
         public string Accent { get; set; } = "#B6F36A";
         public string Theme { get; set; } = "Dark";
+        public string ColorTheme { get; set; } = "Midnight";
         public string Density { get; set; } = "Balanced";
         public string HomePage { get; set; } = "";
         public string StartPageBackground { get; set; } = "";
@@ -121,17 +126,75 @@ public partial class MainWindow : Window
         public List<RecentPage> RecentPages { get; set; } = new();
         public List<Bookmark> Bookmarks { get; set; } = new()
         {
-            new() { Title = "YouTube", Url = "https://youtube.com" },
-            new() { Title = "GitHub", Url = "https://github.com" },
-            new() { Title = "Wikipedia", Url = "https://wikipedia.org" }
+            new() { Title = "YouTube", Url = "https://youtube.com" }
         };
         public List<Shortcut> Shortcuts { get; set; } = new()
         {
             new() { Title = "YouTube", Url = "https://youtube.com" },
-            new() { Title = "GitHub", Url = "https://github.com" },
-            new() { Title = "Wikipedia", Url = "https://wikipedia.org" }
         };
     }
+
+
+    sealed class BrowserTheme
+    {
+        public string Name { get; }
+        public string Background { get; }
+        public string Surface { get; }
+        public string Inset { get; }
+        public string Outline { get; }
+        public string Text { get; }
+        public string Muted { get; }
+
+        public BrowserTheme(
+            string name,
+            string background,
+            string surface,
+            string inset,
+            string outline,
+            string text,
+            string muted)
+        {
+            Name = name;
+            Background = background;
+            Surface = surface;
+            Inset = inset;
+            Outline = outline;
+            Text = text;
+            Muted = muted;
+        }
+    }
+
+    static readonly Dictionary<string, BrowserTheme> BuiltInThemes = new()
+    {
+        // Dark themes
+        ["Midnight"] = new("Midnight", "#101319", "#171A21", "#1E242E", "#37404D", "#EEF0F4", "#9298A5"),
+        ["OLED Black"] = new("OLED Black", "#000000", "#0A0A0A", "#141414", "#303030", "#F5F5F5", "#999999"),
+        ["Ocean"] = new("Ocean", "#142B3A", "#1B3545", "#234253", "#36596B", "#E4F3FA", "#9BBBCB"),
+        ["Cyberpunk"] = new("Cyberpunk", "#181326", "#211A32", "#2B2140", "#49345D", "#F5EAF8", "#B9A3C7"),
+        ["Crimson"] = new("Crimson", "#281719", "#351F22", "#42272B", "#624044", "#F8E9E9", "#C6A4A5"),
+        ["Arctic"] = new("Arctic", "#172533", "#203342", "#293F50", "#405B6D", "#EAF5FC", "#A4BDCE"),
+        ["Emerald"] = new("Emerald", "#142820", "#1C3429", "#254334", "#3C604B", "#E6F5EC", "#A1C2AD"),
+        ["Graphite"] = new("Graphite", "#222222", "#2B2B2B", "#353535", "#484848", "#F3F3F3", "#AAAAAA"),
+        ["Royal"] = new("Royal", "#211B35", "#2B2343", "#372C53", "#51416F", "#F0EAFE", "#B9B1D0"),
+        ["Coffee"] = new("Coffee", "#30251F", "#3A2D25", "#49382D", "#665040", "#F4E8DD", "#C7AFA3"),
+        ["Cherry"] = new("Cherry", "#301B29", "#3B2333", "#492B3E", "#69445A", "#F9EAF2", "#C8A5B7"),
+        ["Nord"] = new("Nord", "#2E3440", "#3B4252", "#434C5E", "#596477", "#ECEFF4", "#B5BEC9"),
+        ["Volcano"] = new("Volcano", "#301D18", "#3D251E", "#4B2F25", "#704637", "#F8E9DD", "#C7A18D"),
+        ["Sakura"] = new("Sakura", "#33232E", "#402B38", "#503545", "#704D60", "#FCEBF2", "#C9A8B8"),
+        ["Forest"] = new("Forest", "#202B28", "#293832", "#34453D", "#4A6255", "#E4EEE8", "#A6B9AE"),
+        ["Sunset"] = new("Sunset", "#30231F", "#3D2C26", "#4B3830", "#6B5044", "#F5E9E2", "#C7AFA3"),
+
+        // Light themes
+        ["Light"] = new("Light", "#F4F6F9", "#FFFFFF", "#FFFFFF", "#CAD2DD", "#23272F", "#696F7B"),
+        ["Snow"] = new("Snow", "#F4F6FA", "#FFFFFF", "#EAEDF3", "#D5DAE4", "#252B36", "#737B89"),
+        ["Mint"] = new("Mint", "#EAF4EF", "#F8FFFA", "#DCECE3", "#C3D9CC", "#203B30", "#648071"),
+        ["Lavender"] = new("Lavender", "#F0EDF8", "#FBF9FF", "#E5DFF1", "#D1C7E3", "#302A42", "#776D8C"),
+        ["Rose"] = new("Rose", "#F9EEF1", "#FFF9FB", "#F1DFE5", "#E5C8D2", "#412B35", "#896B78"),
+        ["Sand"] = new("Sand", "#F3EBDD", "#FFFAF1", "#EAE0CE", "#D9C9AF", "#3B3024", "#85735E"),
+        ["Sky"] = new("Sky", "#EAF3FA", "#F8FCFF", "#DCEAF5", "#C5D9E8", "#25394A", "#647D91"),
+        ["Slate"] = new("Slate", "#E9EDF2", "#F8FAFC", "#DCE2EA", "#C5CEDA", "#293442", "#687587")
+    };
+
 
     readonly List<BrowserTab> tabs = new();
     readonly string settingsPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tryxtor", "settings.json");
@@ -158,6 +221,8 @@ public partial class MainWindow : Window
         CoreWebView2Environment? sharedPrivateEnvironment = null, string? sharedPrivateProfilePath = null)
     {
         InitializeComponent();
+        AddressBox.GotKeyboardFocus += AddressBox_GotKeyboardFocus;
+        AddressBox.LostKeyboardFocus += AddressBox_LostKeyboardFocus;
         maximizeIcon = (Path)FindName("MaximizeIcon");
         this.privateMode = privateMode;
         Closing += (_, _) =>
@@ -169,6 +234,11 @@ public partial class MainWindow : Window
                 passwordAccountPopup.IsOpen = false;
                 passwordAccountPopup = null;
             }
+            if (passwordSavePopup != null)
+            {
+                ClosePasswordSavePopup();
+                passwordSavePopup = null;
+            }
 
             foreach (var openTab in tabs.ToList())
             {
@@ -178,6 +248,7 @@ public partial class MainWindow : Window
             }
 
             tabs.Clear();
+            UpdateTabStripLayout();
             activeTab = null;
         };
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessageHook);
@@ -361,6 +432,9 @@ public partial class MainWindow : Window
 
     void ShowPasswordAccountMenu(BrowserTab tab, List<VaultEntry> accounts)
     {
+        if (tab != tab.Owner.activeTab || !tab.View.IsVisible)
+            return;
+
         if (tab.Owner.privateMode)
             return;
 
@@ -561,6 +635,191 @@ public partial class MainWindow : Window
         popup.IsOpen = true;
     }
 
+    void ShowPasswordSavePopup(BrowserTab tab, VaultEntry? existingAccount)
+    {
+        if (tab.Owner.privateMode ||
+            tab != tab.Owner.activeTab ||
+            !tab.View.IsVisible ||
+            !tab.Owner.passwordVault.IsUnlocked ||
+            string.IsNullOrWhiteSpace(tab.PendingLoginOrigin) ||
+            string.IsNullOrWhiteSpace(tab.PendingLoginUsername) ||
+            string.IsNullOrEmpty(tab.PendingLoginPassword))
+            return;
+
+        tab.Owner.ClosePasswordSavePopup();
+
+        string website = tab.PendingLoginOrigin;
+        string username = tab.PendingLoginUsername;
+        string password = tab.PendingLoginPassword;
+
+        bool isUpdate = existingAccount != null;
+        bool light = tab.Owner.preferences.Theme == "Light";
+
+        Brush background = new SolidColorBrush(
+            light ? Color.FromRgb(255, 255, 255) : Color.FromRgb(30, 34, 43));
+
+        Brush foreground = new SolidColorBrush(
+            light ? Color.FromRgb(35, 42, 53) : Color.FromRgb(239, 242, 247));
+
+        Brush muted = new SolidColorBrush(
+            light ? Color.FromRgb(110, 120, 135) : Color.FromRgb(155, 165, 180));
+
+        Brush accent = ParseBrush(tab.Owner.preferences.Accent, Brushes.LightGreen);
+
+        var panel = new StackPanel { Margin = new Thickness(20) };
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = isUpdate ? "UPDATE PASSWORD?" : "SAVE PASSWORD?",
+            FontSize = 11,
+            FontWeight = FontWeights.Bold,
+            Foreground = muted,
+            Margin = new Thickness(0, 0, 0, 10)
+        });
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = isUpdate
+                ? $"The password for {username} has changed."
+                : $"Save the login for {username}?",
+            FontSize = 14,
+            Foreground = foreground,
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = website,
+            FontSize = 11,
+            Foreground = muted,
+            Margin = new Thickness(0, 7, 0, 18)
+        });
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+
+        var notNowButton = new Button
+        {
+            Content = "Not now",
+            Padding = new Thickness(13, 8, 13, 8),
+            Margin = new Thickness(0, 0, 8, 0),
+            Background = Brushes.Transparent,
+            Foreground = foreground,
+            BorderBrush = muted,
+            Cursor = Cursors.Hand
+        };
+
+        var saveButton = new Button
+        {
+            Content = isUpdate ? "Update" : "Save",
+            Padding = new Thickness(16, 8, 16, 8),
+            Background = accent,
+            Foreground = light ? Brushes.White : Brushes.Black,
+            BorderThickness = new Thickness(0),
+            FontWeight = FontWeights.SemiBold,
+            Cursor = Cursors.Hand
+        };
+
+        buttons.Children.Add(notNowButton);
+        buttons.Children.Add(saveButton);
+        panel.Children.Add(buttons);
+
+        var saveWindow = new Window
+        {
+            Title = "Tryxtor Passwords",
+            Owner = tab.Owner,
+            Width = 370,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            WindowStyle = WindowStyle.None,
+            AllowsTransparency = true,
+            ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false,
+            Background = Brushes.Transparent,
+            Foreground = foreground,
+            Content = new Border
+            {
+                Background = background,
+                BorderBrush = new SolidColorBrush(
+                    light ? Color.FromRgb(220, 225, 233) : Color.FromRgb(57, 65, 78)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
+                Child = panel
+            }
+        };
+
+        tab.Owner.passwordSavePopup = saveWindow;
+
+        void ClearPendingLogin()
+        {
+            tab.PendingLoginOrigin = null;
+            tab.PendingLoginUsername = null;
+            tab.PendingLoginPassword = null;
+        }
+
+        saveWindow.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(tab.Owner.passwordSavePopup, saveWindow))
+                tab.Owner.passwordSavePopup = null;
+
+            ClearPendingLogin();
+        };
+
+        notNowButton.Click += (_, _) => saveWindow.Close();
+
+        saveButton.Click += (_, _) =>
+        {
+            try
+            {
+                if (isUpdate && existingAccount != null)
+                {
+                    tab.Owner.passwordVault.UpdateEntry(new VaultEntry
+                    {
+                        Id = existingAccount.Id,
+                        Website = website,
+                        Username = username,
+                        Password = password,
+                        Notes = existingAccount.Notes
+                    });
+                }
+                else
+                {
+                    tab.Owner.passwordVault.AddEntry(new VaultEntry
+                    {
+                        Website = website,
+                        Username = username,
+                        Password = password
+                    });
+                }
+
+                saveWindow.Close();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "Could not save the login:\n\n" + ex.Message,
+                    "Tryxtor Passwords",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        };
+        saveWindow.Show();
+    }
+
+    void ClosePasswordSavePopup()
+    {
+        if (passwordSavePopup == null)
+            return;
+
+        var popup = passwordSavePopup;
+        passwordSavePopup = null;
+
+        popup.Close();
+    }
+
     bool PromptToUnlockVault()
     {
         bool light = preferences.Theme == "Light";
@@ -749,21 +1008,35 @@ public partial class MainWindow : Window
         catch (Exception ex) { MessageBox.Show("Could not save settings: " + ex.Message, "Tryxtor"); }
     }
 
+
     void ApplyAppearance()
     {
+        var theme = BuiltInThemes.TryGetValue(
+            preferences.ColorTheme,
+            out var selectedTheme)
+            ? selectedTheme
+            : BuiltInThemes["Midnight"];
+
         bool light = preferences.Theme == "Light";
-        Color background = light ? Color.FromRgb(244, 246, 249) : Color.FromRgb(16, 19, 25);
-        Color surface = light ? Colors.White : Color.FromRgb(23, 26, 33);
-        Color inset = light ? Color.FromRgb(255, 255, 255) : Color.FromRgb(30, 36, 46);
-        Color outline = light ? Color.FromRgb(202, 210, 221) : Color.FromRgb(55, 64, 77);
-        Brush text = new SolidColorBrush(light ? Color.FromRgb(35, 39, 47) : Color.FromRgb(238, 240, 244));
-        Brush muted = new SolidColorBrush(light ? Color.FromRgb(105, 112, 123) : Color.FromRgb(146, 152, 165));
+
+        Color background = ParseColor(theme.Background);
+        Color surface = ParseColor(theme.Surface);
+        Color inset = ParseColor(theme.Inset);
+        Color outline = ParseColor(theme.Outline);
+
+        Brush text = ParseBrush(theme.Text, Brushes.White);
+        Brush muted = ParseBrush(theme.Muted, Brushes.Gray);
         Brush accent = ParseBrush(preferences.Accent, Brushes.LightGreen);
 
+
         Resources["HoverSurface"] = new SolidColorBrush(
-            light
-                ? Color.FromRgb(232, 236, 242)
-                : Color.FromRgb(39, 45, 56)); TitleBar.Background = Toolbar.Background = BookmarkBar.Background = new SolidColorBrush(surface);
+            Blend(surface, inset, .5));
+        // Apply the selected theme to the browser chrome
+        TitleBar.Background = new SolidColorBrush(surface);
+        Toolbar.Background = new SolidColorBrush(surface);
+        BookmarkBar.Background = new SolidColorBrush(surface);
+        TabStrip.Background = new SolidColorBrush(surface);
+        rootGrid.Background = new SolidColorBrush(background);
         if (!string.IsNullOrWhiteSpace(preferences.StartPageBackground) && System.IO.File.Exists(preferences.StartPageBackground))
         {
             try
@@ -801,7 +1074,9 @@ public partial class MainWindow : Window
         foreach (var tab in tabs)
         {
             tab.TitleButton.Foreground = text;
-            tab.Surface.Background = tab == activeTab ? new SolidColorBrush(Blend(ParseColor(preferences.Accent), backgroundColor: background, .20)) : new SolidColorBrush(light ? Color.FromRgb(230, 233, 238) : Color.FromRgb(32, 35, 43));
+            tab.Surface.Background = tab == activeTab
+                ? new SolidColorBrush(Blend(ParseColor(preferences.Accent), background, .20))
+                : new SolidColorBrush(Blend(surface, background, .5));
         }
         foreach (var button in Toolbar.Children.OfType<Panel>().SelectMany(p => p.Children.OfType<Button>())) button.Foreground = text;
         UpdateBookmarkButton();
@@ -909,7 +1184,10 @@ public partial class MainWindow : Window
         {
             Content = "x", ToolTip = "Close tab",
             Style = (Style)FindResource("ChromeButton"),
-            Padding = new Thickness(8, 6, 9, 6), FontSize = 12
+            Width = 24,
+            MinWidth = 0,
+            Padding = new Thickness(0),
+            FontSize = 11
         };
         close.Click += (_, e) => { e.Handled = true; CloseTab(tab); };
         DockPanel.SetDock(close, Dock.Right);
@@ -920,7 +1198,7 @@ public partial class MainWindow : Window
             Style = (Style)FindResource("TabTitleButton"),
             Background = Brushes.Transparent,
             Foreground = ParseBrush(preferences.Theme == "Light" ? "#263142" : "#E7EAF0", Brushes.White),
-            MinWidth = 105, Padding = new Thickness(12, 7, 5, 7)
+            MinWidth = 0, Padding = new Thickness(8, 7, 3, 7)
         };
         tab.TitleButton.Click += (_, e) => { e.Handled = true; ActivateTab(tab); };
         tab.TitleButton.PreviewMouseLeftButtonDown += (_, e) =>
@@ -935,17 +1213,36 @@ public partial class MainWindow : Window
         tab.Surface.Child = header;
     }
 
+    void UpdateTabStripLayout()
+    {
+        TabStrip.Rows = 1;
+        TabStrip.Columns = Math.Max(1, tabs.Count);
+    }
+
     async Task<bool> AddTab(string? address = null)
     {
+        // Close any password popup before creating a new tab.
+        if (passwordAccountPopup?.IsOpen == true)
+        {
+            passwordAccountPopup.IsOpen = false;
+            passwordAccountPopup = null;
+        }
         var tab = new BrowserTab { Owner = this };
         CreateTabHeader(tab);
         tabs.Add(tab);
         TabStrip.Children.Add(tab.Surface);
+        UpdateTabStripLayout();
 
         tab.View.DefaultBackgroundColor = System.Drawing.Color.FromArgb(255, 16, 19, 25);
         BrowserHost.Children.Add(tab.View);
         tab.View.NavigationStarting += (_, e) =>
         {
+            if (tab.Owner.passwordAccountPopup?.IsOpen == true &&
+                tab.Owner.passwordAccountPopup.PlacementTarget == tab.View)
+            {
+                tab.Owner.passwordAccountPopup.IsOpen = false;
+                tab.Owner.passwordAccountPopup = null;
+            }
             tab.Url = e.Uri;
             if (tab == tab.Owner.activeTab) tab.Owner.SetAddressText(e.Uri);
         };
@@ -985,32 +1282,74 @@ public partial class MainWindow : Window
                     else if (receivedMessage == "trixter:history")
                         owner.History_Click(owner, new RoutedEventArgs());
 
-                    else if (receivedMessage == "trixter:login-form-detected" && !owner.privateMode)
+                    else if (receivedMessage.StartsWith("trixter:password-submitted:") && !owner.privateMode)
                     {
-                        if (!owner.passwordVault.IsUnlocked)
-                            return;
-
-                        // Verify that the message came from the current page's origin.
                         if (!Uri.TryCreate(message.Source, UriKind.Absolute, out var sourceUri) ||
                             !Uri.TryCreate(tab.Url, UriKind.Absolute, out var tabUri))
+                            return;
+
+                        if (sourceUri.Scheme != Uri.UriSchemeHttp &&
+                            sourceUri.Scheme != Uri.UriSchemeHttps)
                             return;
 
                         string sourceOrigin = sourceUri.GetLeftPart(UriPartial.Authority);
                         string tabOrigin = tabUri.GetLeftPart(UriPartial.Authority);
 
-                        if (!string.Equals(
-                            sourceOrigin,
-                            tabOrigin,
+                        if (!string.Equals(sourceOrigin, tabOrigin,
                             StringComparison.OrdinalIgnoreCase))
                             return;
 
-                        var accounts = owner.passwordVault.GetEntriesForWebsite(sourceOrigin);
+                        try
+                        {
+                            string json = receivedMessage[
+                                "trixter:password-submitted:".Length..];
 
-                        System.Diagnostics.Debug.WriteLine(
-                            $"[Tryxtor Password Manager] Found {accounts.Count} saved account(s) for {sourceOrigin}");
+                            using var document = JsonDocument.Parse(json);
+                            var root = document.RootElement;
+
+                            string username = root.GetProperty("username").GetString() ?? "";
+                            string password = root.GetProperty("password").GetString() ?? "";
+
+                            if (string.IsNullOrWhiteSpace(username) ||
+                                string.IsNullOrEmpty(password) ||
+                                username.Length > 500 ||
+                                password.Length > 2000)
+                                return;
+
+                            tab.PendingLoginOrigin = sourceOrigin;
+                            tab.PendingLoginUsername = username;
+                            tab.PendingLoginPassword = password;
+
+                            if (!owner.passwordVault.IsUnlocked)
+                                return;
+
+                            var existingAccounts =
+                                owner.passwordVault.GetEntriesForWebsite(sourceOrigin);
+
+                            var matchingAccount = existingAccounts.FirstOrDefault(account =>
+                                string.Equals(
+                                    account.Username,
+                                    username,
+                                    StringComparison.OrdinalIgnoreCase));
+
+                            if (matchingAccount == null || matchingAccount.Password != password)
+                            {
+                                owner.ShowPasswordSavePopup(tab, matchingAccount);
+                            }
+
+                            System.Diagnostics.Debug.WriteLine(
+                                "[Tryxtor] Login submission detected.");
+                        }
+                        catch (JsonException)
+                        {
+                            // Ignore invalid messages from webpages.
+                        }
                     }
                     else if (receivedMessage == "trixter:show-password-menu" && !owner.privateMode)
                     {
+                        if (tab != owner.activeTab || !tab.View.IsVisible)
+                            return;
+
                         if (!Uri.TryCreate(message.Source, UriKind.Absolute, out var sourceUri) ||
                             !Uri.TryCreate(tab.Url, UriKind.Absolute, out var tabUri))
                             return;
@@ -1029,14 +1368,61 @@ public partial class MainWindow : Window
 
                         owner.ShowPasswordAccountMenu(tab, accounts);
                     }
+                    else if (receivedMessage == "trixter:hide-password-menu")
+                    {
+                        owner.passwordAccountPopup?.SetCurrentValue(Popup.IsOpenProperty, false);
+                        owner.passwordAccountPopup = null;
+                    }
                 };
                 _ = core.AddScriptToExecuteOnDocumentCreatedAsync(
                     """
                     (() => {
                         let lastPrompt = 0;
 
+                        document.addEventListener('submit', (event) => {
+                            const form = event.target;
+
+                            if (!(form instanceof HTMLFormElement))
+                                return;
+
+                            const password = form.querySelector('input[type="password"]');
+
+                            if (!password || !password.value)
+                                return;
+
+                            const inputs = Array.from(form.querySelectorAll('input'));
+
+                            const username = inputs.find(input =>
+                                input !== password &&
+                                (
+                                    input.autocomplete === 'username' ||
+                                    input.type === 'email' ||
+                                    /user|email|login|account/i.test(
+                                        [
+                                            input.name,
+                                            input.id,
+                                            input.autocomplete,
+                                            input.getAttribute('aria-label')
+                                        ].join(' ')
+                                    )
+                                )
+                            );
+
+                            if (!username || !username.value)
+                                return;
+
+                            window.chrome.webview.postMessage(
+                                'trixter:password-submitted:' + JSON.stringify({
+                                    username: username.value,
+                                    password: password.value
+                                })
+                            );
+                        }, true);
+
                         document.addEventListener('focusin', (event) => {
                             const target = event.target;
+                            if (!document.hasFocus())
+                                return;
 
                             if (!(target instanceof HTMLInputElement))
                                 return;
@@ -1079,6 +1465,37 @@ public partial class MainWindow : Window
                             window.chrome.webview.postMessage(
                                 'trixter:show-password-menu'
                             );
+                        });
+                        document.addEventListener('pointerdown', (event) => {
+                            const target = event.target;
+
+                            const isPasswordField =
+                                target instanceof HTMLInputElement &&
+                                target.type === 'password';
+
+                            const isUsernameField =
+                                target instanceof HTMLInputElement &&
+                                (
+                                    target.type === 'email' ||
+                                    target.autocomplete === 'username' ||
+                                    /email|user|login|account/i.test(
+                                        [
+                                            target.name,
+                                            target.id,
+                                            target.autocomplete,
+                                            target.getAttribute('aria-label')
+                                        ].join(' ')
+                                    )
+                                );
+
+                            if (!isPasswordField && !isUsernameField) {
+                                window.chrome.webview.postMessage(
+                                    'trixter:hide-password-menu'
+                                );
+                            }
+                        });
+                        window.addEventListener('blur', () => {
+                            window.chrome.webview.postMessage('trixter:hide-password-menu');
                         });
                     })();
                     """
@@ -1185,12 +1602,14 @@ public partial class MainWindow : Window
         // Detach the existing WebView2 control. It is never recreated or navigated.
         tabs.Remove(tab);
         TabStrip.Children.Remove(tab.Surface);
+        UpdateTabStripLayout();
         BrowserHost.Children.Remove(tab.View);
 
         tab.Owner = detachedWindow;
         detachedWindow.CreateTabHeader(tab);
         detachedWindow.tabs.Add(tab);
         detachedWindow.TabStrip.Children.Add(tab.Surface);
+        detachedWindow.UpdateTabStripLayout();
         detachedWindow.BrowserHost.Children.Add(tab.View);
         detachedWindow.ActivateTab(tab);
 
@@ -1260,6 +1679,7 @@ public partial class MainWindow : Window
         bool wasActive = tab == activeTab;
         tabs.RemoveAt(oldIndex);
         TabStrip.Children.Remove(tab.Surface);
+        UpdateTabStripLayout();
         BrowserHost.Children.Remove(tab.View);
 
         // Removing a WPF control from the visual tree does not release its
@@ -1271,6 +1691,8 @@ public partial class MainWindow : Window
         }
         tab.View.Dispose();
 
+        if (wasActive)
+            activeTab = null;
         if (tabs.Count == 0)
         {
             activeTab = null;
@@ -1293,16 +1715,57 @@ public partial class MainWindow : Window
 
     void ActivateTab(BrowserTab tab)
     {
+        if (activeTab != tab)
+            ClosePasswordSavePopup();
+        if (activeTab != tab && passwordAccountPopup?.IsOpen == true)
+        {
+            passwordAccountPopup.IsOpen = false;
+            passwordAccountPopup = null;
+        }
+        var previousTab = activeTab;
+        if (previousTab != null && previousTab != tab && tabs.Contains(previousTab))
+        {
+            try
+            {
+                var core = previousTab.View.CoreWebView2;
+                if (core != null)
+                {
+                    _ = core.ExecuteScriptAsync(
+                        "document.activeElement && document.activeElement.blur && document.activeElement.blur();");
+                }
+            }
+            catch (ObjectDisposedException) { }
+            catch (InvalidOperationException) { }
+        }
         activeTab = tab;
+        var theme = BuiltInThemes.TryGetValue(
+            preferences.ColorTheme,
+            out var selectedTheme)
+            ? selectedTheme
+            : BuiltInThemes["Midnight"];
+
+        Color background = ParseColor(theme.Background);
+        Color surface = ParseColor(theme.Surface);
+        Brush text = ParseBrush(theme.Text, Brushes.White);
+        Brush accent = ParseBrush(preferences.Accent, Brushes.LightGreen);
         foreach (var item in tabs)
         {
-            item.View.Visibility = item == tab ? Visibility.Visible : Visibility.Collapsed;
-            item.TitleButton.Foreground = ParseBrush(preferences.Theme == "Light" ? "#263142" : "#E7EAF0", Brushes.White);
+            item.View.Visibility = item == tab
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+            item.TitleButton.Foreground = text;
+
             item.Surface.Background = item == tab
-                ? new SolidColorBrush(Blend(ParseColor(preferences.Accent), preferences.Theme == "Light" ? Colors.White : Color.FromRgb(16, 19, 25), .19))
-                : new SolidColorBrush(preferences.Theme == "Light" ? Color.FromRgb(230, 233, 238) : Color.FromRgb(32, 35, 43));
-            item.Surface.BorderBrush = item == tab ? ParseBrush(preferences.Accent, Brushes.LightGreen) : Brushes.Transparent;
-            item.Surface.BorderThickness = new Thickness(0, 0, 0, item == tab ? 2 : 0);
+                ? new SolidColorBrush(Blend(ParseColor(preferences.Accent), background, .19))
+                : new SolidColorBrush(Blend(surface, background, .5));
+
+            item.Surface.BorderBrush = item == tab
+                ? accent
+                : Brushes.Transparent;
+
+            item.Surface.BorderThickness = new Thickness(
+                0, 0, 0, item == tab ? 2 : 0);
         }
         SetAddressText(tab.Url);
         UpdateBookmarkButton();
@@ -1327,9 +1790,27 @@ public partial class MainWindow : Window
     string Resolve(string input)
     {
         string value = input.Trim();
-        if (value.Length == 0) return "https://www.google.com";
-        if (Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https")) return uri.ToString();
-        if (!value.Contains(' ') && value.Contains('.')) return "https://" + value;
+
+        if (value.Length == 0)
+            return "https://www.google.com";
+
+        // Handle local Windows file paths
+        if (System.IO.File.Exists(value))
+            return new Uri(value).AbsoluteUri;
+
+        // Handle file:// URLs
+        if (Uri.TryCreate(value, UriKind.Absolute, out var fileUri) &&
+            fileUri.IsFile)
+            return fileUri.AbsoluteUri;
+
+        // Handle normal websites
+        if (Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == "http" || uri.Scheme == "https"))
+            return uri.ToString();
+
+        if (!value.Contains(' ') && value.Contains('.'))
+            return "https://" + value;
+
         string search = SearchTemplate();
         return search.Replace("{query}", Uri.EscapeDataString(value));
     }
@@ -1419,8 +1900,48 @@ public partial class MainWindow : Window
     void SetAddressText(string value)
     {
         settingAddressText = true;
-        AddressBox.Text = value;
+
+        AddressBox.Text = AddressBox.IsKeyboardFocused
+            ? value
+            : FormatUrlForDisplay(value);
+
         settingAddressText = false;
+    }
+
+    static string FormatUrlForDisplay(string value)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+            return value;
+
+        string result = uri.Host;
+
+        if (result.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+            result = result[4..];
+
+        result += uri.AbsolutePath.TrimEnd('/');
+
+        if (!string.IsNullOrEmpty(uri.Query))
+            result += uri.Query;
+
+        if (!string.IsNullOrEmpty(uri.Fragment))
+            result += uri.Fragment;
+
+        return result;
+    }
+
+    void AddressBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (activeTab == null) return;
+
+        SetAddressText(activeTab.Url);
+        AddressBox.SelectAll();
+    }
+
+    void AddressBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (activeTab == null) return;
+
+        SetAddressText(activeTab.Url);
     }
 
     void RenderBookmarks()
@@ -1797,23 +2318,109 @@ public partial class MainWindow : Window
         var startPageContent = new StackPanel();
         var shortcutsContent = new StackPanel();
         var passwordContent = new StackPanel();
-        string selectedTheme = preferences.Theme;
+        string selectedColorTheme = BuiltInThemes.ContainsKey(preferences.ColorTheme)
+            ? preferences.ColorTheme
+            : "Midnight";
         string selectedDensity = preferences.Density;
         var hex = new TextBox { Text = preferences.Accent, Padding = new Thickness(9), Background = field, Foreground = ink, BorderBrush = outline };
-        var themeChoices = new Grid { Margin = new Thickness(0, 4, 0, 10) };
-        themeChoices.ColumnDefinitions.Add(new ColumnDefinition()); themeChoices.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) }); themeChoices.ColumnDefinitions.Add(new ColumnDefinition());
-        var darkChoice = MakeThemeChoice("Dark", false, selectedTheme == "Dark");
-        var lightChoice = MakeThemeChoice("Light", true, selectedTheme == "Light");
-        Grid.SetColumn(lightChoice, 2); themeChoices.Children.Add(darkChoice); themeChoices.Children.Add(lightChoice);
-        void PickTheme(string value)
+
+        var themeChoices = new WrapPanel
         {
-            selectedTheme = value;
-            var currentAccent = ParseBrush(hex.Text, accent);
-            SetThemeChoiceState(darkChoice, selectedTheme == "Dark", currentAccent);
-            SetThemeChoiceState(lightChoice, selectedTheme == "Light", currentAccent);
+            Margin = new Thickness(-4, 4, 0, 10)
+        };
+
+        var themeBorders = new Dictionary<string, Border>();
+
+        void UpdateThemeSelection()
+        {
+            foreach (var item in themeBorders)
+            {
+                bool selected = item.Key == selectedColorTheme;
+
+                item.Value.BorderBrush = selected
+                    ? ParseBrush(preferences.Accent, Brushes.LightGreen)
+                    : outline;
+
+                item.Value.BorderThickness = new Thickness(selected ? 2 : 1);
+            }
         }
-        darkChoice.Click += (_, _) => PickTheme("Dark");
-        lightChoice.Click += (_, _) => PickTheme("Light");
+
+        foreach (var theme in BuiltInThemes.Values)
+        {
+            var themePreview = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var colorPreview = new StackPanel
+            {
+                Width = 35,
+                Height = 35,
+                Background = ParseBrush(theme.Background, Brushes.Black),
+                Margin = new Thickness(0, 0, 9, 0)
+            };
+
+            colorPreview.Children.Add(new Border
+            {
+                Height = 11,
+                Background = ParseBrush(theme.Surface, Brushes.Gray)
+            });
+
+            colorPreview.Children.Add(new Border
+            {
+                Height = 12,
+                Margin = new Thickness(5, 5, 5, 0),
+                Background = ParseBrush(preferences.Accent, Brushes.LightGreen)
+            });
+
+            themePreview.Children.Add(colorPreview);
+
+            themePreview.Children.Add(new TextBlock
+            {
+                Text = theme.Name,
+                Foreground = ParseBrush(theme.Text, Brushes.White),
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            var previewBorder = new Border
+            {
+                Width = 155,
+                Height = 57,
+                Margin = new Thickness(4),
+                Padding = new Thickness(7),
+                CornerRadius = new CornerRadius(8),
+                Background = ParseBrush(theme.Surface, Brushes.Gray),
+                BorderBrush = outline,
+                BorderThickness = new Thickness(1),
+                Child = themePreview
+            };
+
+            themeBorders[theme.Name] = previewBorder;
+
+            var themeButton = new Button
+            {
+                Content = previewBorder,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Select " + theme.Name
+            };
+
+            themeButton.Click += (_, _) =>
+            {
+                selectedColorTheme = theme.Name;
+                UpdateThemeSelection();
+            };
+
+            themeChoices.Children.Add(themeButton);
+        }
+
+        UpdateThemeSelection();
+
         var densityChoices = new Grid { Margin = new Thickness(0, 4, 0, 10) };
         densityChoices.ColumnDefinitions.Add(new ColumnDefinition());
         densityChoices.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(9) });
@@ -1862,8 +2469,7 @@ public partial class MainWindow : Window
             Color color = ParseColor(hex.Text);
             PlaceWheelMarker(color);
             var selectedAccent = new SolidColorBrush(color);
-            SetThemeChoiceState(darkChoice, selectedTheme == "Dark", selectedAccent);
-            SetThemeChoiceState(lightChoice, selectedTheme == "Light", selectedAccent);
+            UpdateThemeSelection();
             SetDensityChoiceState(compactChoice, selectedDensity == "Compact", selectedAccent, outline);
             SetDensityChoiceState(balancedChoice, selectedDensity == "Balanced", selectedAccent, outline);
             SetDensityChoiceState(roomyChoice, selectedDensity == "Roomy", selectedAccent, outline);
@@ -2962,7 +3568,12 @@ public partial class MainWindow : Window
         save.Click += (_, _) =>
         {
             if (!IsColor(hex.Text)) { MessageBox.Show("Enter a valid color such as #83C9FF.", "Settings"); return; }
-            preferences.Theme = selectedTheme;
+            preferences.ColorTheme = selectedColorTheme;
+
+            preferences.Theme = new[]
+            {
+                "Light", "Snow", "Mint", "Lavender", "Rose", "Sand", "Sky", "Slate"
+            }.Contains(selectedColorTheme) ? "Light" : "Dark";
             preferences.Density = selectedDensity;
             preferences.Accent = hex.Text.Trim();
             preferences.ShowBookmarks = bookmarkCheck.IsChecked == true;

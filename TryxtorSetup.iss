@@ -1,5 +1,5 @@
 #define MyAppName "Tryxtor"
-#define MyAppVersion "1.2.5"
+#define MyAppVersion "1.3.0"
 #define MyAppPublisher "Tryxtor"
 #define MyAppExeName "Tryxtor.exe"
 
@@ -20,9 +20,9 @@ UninstallDisplayIcon={app}\Tryxtor.exe
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
-VersionInfoVersion=1.2.5.0
+VersionInfoVersion=1.3.0.0
 OutputDir=installer-output
-OutputBaseFilename=TryxtorSetup-1.2.5-x64
+OutputBaseFilename=TryxtorSetup-1.3.0-x64
 SetupLogging=yes
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
