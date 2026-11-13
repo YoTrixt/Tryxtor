@@ -102,7 +102,6 @@ public partial class MainWindow : Window
         public string Title { get; set; } = "";
         public string Detail { get; set; } = "";
         public string Value { get; set; } = "";
-        public bool IsSearch { get; set; }
         public bool IsRecentSearch { get; set; }
     }
     private VaultService passwordVault = new();
@@ -117,7 +116,6 @@ public partial class MainWindow : Window
         public string Density { get; set; } = "Balanced";
         public string HomePage { get; set; } = "";
         public string StartPageBackground { get; set; } = "";
-        public string SearchUrl { get; set; } = "https://www.google.com/search?q={query}";
         public string SearchEngine { get; set; } = "Google";
         public bool ShowBookmarks { get; set; } = true;
         public bool ShowShortcuts { get; set; } = true;
@@ -204,7 +202,6 @@ public partial class MainWindow : Window
     CoreWebView2Environment? browserEnvironment;
     CoreWebView2Environment? privateEnvironment;
     BrowserTab? activeTab;
-    Path maximizeIcon = null!;
     Grid rootGrid = null!;
     List<AddressSuggestion> currentSuggestions = new();
     bool settingAddressText;
@@ -223,7 +220,6 @@ public partial class MainWindow : Window
         InitializeComponent();
         AddressBox.GotKeyboardFocus += AddressBox_GotKeyboardFocus;
         AddressBox.LostKeyboardFocus += AddressBox_LostKeyboardFocus;
-        maximizeIcon = (Path)FindName("MaximizeIcon");
         this.privateMode = privateMode;
         Closing += (_, _) =>
         {
@@ -259,16 +255,15 @@ public partial class MainWindow : Window
                 chrome.ResizeBorderThickness = WindowState == WindowState.Maximized
                     ? new Thickness(10, 0, 10, 10)
                     : new Thickness(10);
-            if (maximizeIcon != null)
-                maximizeIcon.Data = WindowState == WindowState.Maximized
+            if (MaximizeIcon != null)
+                MaximizeIcon.Data = WindowState == WindowState.Maximized
                     ? Geometry.Parse("M 5,5 L 16,5 L 16,16 L 5,16 Z M 2,12 L 2,2 L 12,2")
                     : Geometry.Parse("M 3,3 L 15,3 L 15,15 L 3,15 Z");
         };
         if (privateMode)
         {
             Title = "Tryxtor — Incognito";
-            BrandLabel.Text = "TRIXTER  ·  INCOGNITO";
-            BrandLabel.Foreground = new SolidColorBrush(Color.FromRgb(190, 164, 255));
+            BrandLabel.Text = "TRYXTOR  ·  INCOGNITO";
             privateProfilePath = sharedPrivateProfilePath ?? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Tryxtor-InPrivate-" + Guid.NewGuid().ToString("N"));
             Closed += (_, _) =>
             {
@@ -288,7 +283,7 @@ public partial class MainWindow : Window
         BuildSearchEngineIcons();
         FitToWorkArea();
         WindowState = WindowState.Maximized;
-        maximizeIcon.Data = Geometry.Parse(
+        MaximizeIcon.Data = Geometry.Parse(
             "M 5,5 L 16,5 L 16,16 L 5,16 Z M 2,12 L 2,2 L 12,2");
         LoadPreferences();
         SearchEngineBox.SelectedItem = SearchEngineBox.Items.OfType<ComboBoxItem>().FirstOrDefault(x => x.Tag?.ToString() == preferences.SearchEngine)
@@ -1017,8 +1012,6 @@ public partial class MainWindow : Window
             ? selectedTheme
             : BuiltInThemes["Midnight"];
 
-        bool light = preferences.Theme == "Light";
-
         Color background = ParseColor(theme.Background);
         Color surface = ParseColor(theme.Surface);
         Color inset = ParseColor(theme.Inset);
@@ -1051,7 +1044,8 @@ public partial class MainWindow : Window
         AddressSurface.Background = HomeSearchSurface.Background = new SolidColorBrush(inset);
         AddressSurface.BorderBrush = HomeSearchSurface.BorderBrush = new SolidColorBrush(outline);
         HomeSearchSurface.BorderThickness = AddressSurface.BorderThickness = new Thickness(1);
-        BrandLabel.Foreground = HomeSearchMark.Foreground = accent;
+        HomeSearchMark.Foreground = accent;
+        BrandLabel.Foreground = privateMode ? new SolidColorBrush(Color.FromRgb(190, 164, 255)) : accent;
         SearchEngineBox.Foreground = text;
         SearchEngineBox.Background = new SolidColorBrush(inset);
         SearchEngineBox.BorderBrush = new SolidColorBrush(outline);
@@ -1064,12 +1058,34 @@ public partial class MainWindow : Window
         HomeSubtitle.Foreground = QuickLinksLabel.Foreground = muted;
         BookmarkBar.Visibility = preferences.ShowBookmarks ? Visibility.Visible : Visibility.Collapsed;
         QuickLinks.Visibility = preferences.ShowShortcuts ? Visibility.Visible : Visibility.Collapsed;
-        if (QuickLinks.Parent is StackPanel startPanel && startPanel.Children.OfType<DockPanel>().FirstOrDefault() is DockPanel shortcutHeader)
-            shortcutHeader.Visibility = preferences.ShowShortcuts ? Visibility.Visible : Visibility.Collapsed;
+        QuickLinksHeader.Visibility = preferences.ShowShortcuts ? Visibility.Visible : Visibility.Collapsed;
         foreach (var button in FindButtons(TitleBar)) button.Foreground = text;
 
         rootGrid.RowDefinitions[0].Height = new GridLength(preferences.Density == "Compact" ? 36 : preferences.Density == "Roomy" ? 50 : 42);
         rootGrid.RowDefinitions[1].Height = new GridLength(preferences.Density == "Compact" ? 42 : preferences.Density == "Roomy" ? 56 : 48);
+        double pickerHeight = preferences.Density switch
+        {
+            "Compact" => 28,
+            "Roomy" => 42,
+            _ => 34
+        };
+
+        SearchEngineBox.Height = pickerHeight;
+        SearchEngineBox.VerticalAlignment = VerticalAlignment.Center;
+
+        foreach (ComboBoxItem item in SearchEngineBox.Items)
+        {
+            item.Height = pickerHeight - 2;
+
+            if (item.Content is FrameworkElement icon)
+            {
+                double iconSize = pickerHeight - 8;
+                icon.Width = iconSize;
+                icon.Height = iconSize;
+                icon.VerticalAlignment = VerticalAlignment.Center;
+                icon.HorizontalAlignment = HorizontalAlignment.Center;
+            }
+        }
         StarButton.Padding = preferences.Density == "Compact" ? new Thickness(3, 0, 3, 0) : new Thickness(8, 4, 8, 4);
         foreach (var tab in tabs)
         {
@@ -1100,20 +1116,20 @@ public partial class MainWindow : Window
         const double radius = 106;
         var pixels = new byte[size * size * 4];
         for (int y = 0; y < size; y++)
-        for (int x = 0; x < size; x++)
-        {
-            double dx = x - (size - 1) / 2.0;
-            double dy = y - (size - 1) / 2.0;
-            double distance = Math.Sqrt(dx * dx + dy * dy);
-            int offset = (y * size + x) * 4;
-            if (distance > radius) continue;
-            double hue = (Math.Atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-            Color color = HsvToColor(hue, Math.Min(1, distance / radius), 1);
-            pixels[offset] = color.B;
-            pixels[offset + 1] = color.G;
-            pixels[offset + 2] = color.R;
-            pixels[offset + 3] = 255;
-        }
+            for (int x = 0; x < size; x++)
+            {
+                double dx = x - (size - 1) / 2.0;
+                double dy = y - (size - 1) / 2.0;
+                double distance = Math.Sqrt(dx * dx + dy * dy);
+                int offset = (y * size + x) * 4;
+                if (distance > radius) continue;
+                double hue = (Math.Atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+                Color color = HsvToColor(hue, Math.Min(1, distance / radius), 1);
+                pixels[offset] = color.B;
+                pixels[offset + 1] = color.G;
+                pixels[offset + 2] = color.R;
+                pixels[offset + 3] = 255;
+            }
         var bitmap = BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
         var canvas = new Canvas { Width = size, Height = size, Background = Brushes.Transparent, IsHitTestVisible = true, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 5) };
         canvas.Children.Add(new Image { Source = bitmap, Width = size, Height = size, IsHitTestVisible = false });
@@ -1148,8 +1164,12 @@ public partial class MainWindow : Window
         double m = value - chroma;
         (double r, double g, double b) = hue switch
         {
-            < 60 => (chroma, x, 0d), < 120 => (x, chroma, 0d), < 180 => (0d, chroma, x),
-            < 240 => (0d, x, chroma), < 300 => (x, 0d, chroma), _ => (chroma, 0d, x)
+            < 60 => (chroma, x, 0d),
+            < 120 => (x, chroma, 0d),
+            < 180 => (0d, chroma, x),
+            < 240 => (0d, x, chroma),
+            < 300 => (x, 0d, chroma),
+            _ => (chroma, 0d, x)
         };
         return Color.FromRgb((byte)Math.Round((r + m) * 255), (byte)Math.Round((g + m) * 255), (byte)Math.Round((b + m) * 255));
     }
@@ -1179,26 +1199,41 @@ public partial class MainWindow : Window
             BorderThickness = new Thickness(0, 0, 0, 2)
         };
 
-        var header = new DockPanel { LastChildFill = true };
+        var header = new Grid();
+
+        header.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star)
+        });
+
+        header.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto
+        });
         var close = new Button
         {
-            Content = "x", ToolTip = "Close tab",
-            Style = (Style)FindResource("ChromeButton"),
+            Content = "x",
+            ToolTip = "Close tab",
+            Style = (Style)FindResource("TabTitleButton"),
             Width = 24,
             MinWidth = 0,
             Padding = new Thickness(0),
             FontSize = 11
         };
         close.Click += (_, e) => { e.Handled = true; CloseTab(tab); };
-        DockPanel.SetDock(close, Dock.Right);
+
 
         tab.TitleButton = new Button
         {
-            Content = tab.Title, ToolTip = tab.Title,
+            Content = tab.Title,
+            ToolTip = tab.Title,
             Style = (Style)FindResource("TabTitleButton"),
             Background = Brushes.Transparent,
             Foreground = ParseBrush(preferences.Theme == "Light" ? "#263142" : "#E7EAF0", Brushes.White),
-            MinWidth = 0, Padding = new Thickness(8, 7, 3, 7)
+            MinWidth = 0,
+            Padding = new Thickness(8, 7, 3, 7),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left
         };
         tab.TitleButton.Click += (_, e) => { e.Handled = true; ActivateTab(tab); };
         tab.TitleButton.PreviewMouseLeftButtonDown += (_, e) =>
@@ -1208,8 +1243,12 @@ public partial class MainWindow : Window
             tabDragStarted = false;
         };
 
-        header.Children.Add(close);
+        Grid.SetColumn(tab.TitleButton, 0);
+        Grid.SetColumn(close, 1);
+
         header.Children.Add(tab.TitleButton);
+        header.Children.Add(close);
+
         tab.Surface.Child = header;
     }
 
@@ -1248,7 +1287,8 @@ public partial class MainWindow : Window
         };
         tab.View.NavigationCompleted += (_, _) =>
         {
-            tab.Title = tab.View.CoreWebView2?.DocumentTitle ?? Host(tab.Url);
+            string? documentTitle = tab.View.CoreWebView2?.DocumentTitle;
+            tab.Title = string.IsNullOrWhiteSpace(documentTitle) ? Host(tab.Url) : documentTitle;
             tab.TitleButton.Content = tab.Title;
             tab.TitleButton.ToolTip = tab.Title;
             if (!string.IsNullOrWhiteSpace(tab.Url))
@@ -1270,7 +1310,9 @@ public partial class MainWindow : Window
                 CoreWebView2 core = tab.View.CoreWebView2;
                 core.WebMessageReceived += (_, message) =>
                 {
-                    string receivedMessage = message.TryGetWebMessageAsString();
+                    string receivedMessage;
+                    try { receivedMessage = message.TryGetWebMessageAsString(); }
+                    catch (ArgumentException) { return; } // page posted a non-string message
 
                     var owner = tab.Owner;
                     if (receivedMessage == "trixter:new-window")
@@ -1337,10 +1379,8 @@ public partial class MainWindow : Window
                                 owner.ShowPasswordSavePopup(tab, matchingAccount);
                             }
 
-                            System.Diagnostics.Debug.WriteLine(
-                                "[Tryxtor] Login submission detected.");
                         }
-                        catch (JsonException)
+                        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException)
                         {
                             // Ignore invalid messages from webpages.
                         }
@@ -1511,12 +1551,17 @@ public partial class MainWindow : Window
         try { await tab.View.EnsureCoreWebView2Async(tab.Owner.privateMode ? tab.Owner.privateEnvironment : tab.Owner.browserEnvironment); }
         catch (Exception ex)
         {
+            tabs.Remove(tab);
+            TabStrip.Children.Remove(tab.Surface);
+            BrowserHost.Children.Remove(tab.View);
+            UpdateTabStripLayout();
+            tab.View.Dispose();
             ShowWebView2InitializationError(ex);
             return false;
         }
         tab.View.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
         tab.View.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
-        if (!tab.Owner.privateMode && tab.View.CoreWebView2 != null)
+        if (!tab.Owner.privateMode)
         {
             try { await ImportOperaUBlockAsync(tab.View.CoreWebView2.Profile); }
             catch (Exception ex) { MessageBox.Show("Tryxtor found uBlock Origin in Opera GX but could not load it.\n\n" + ex.Message, "Tryxtor Extensions", MessageBoxButton.OK, MessageBoxImage.Warning); }
@@ -1524,7 +1569,7 @@ public partial class MainWindow : Window
         ActivateTab(tab);
         var target = string.IsNullOrWhiteSpace(address) ? preferences.HomePage : address;
         if (!string.IsNullOrWhiteSpace(target)) Navigate(target, tab);
-        return tab.View.CoreWebView2 != null;
+        return true;
     }
 
     void TabDrag_MouseMove(object sender, MouseEventArgs e)
@@ -1783,7 +1828,11 @@ public partial class MainWindow : Window
 
     static string Host(string url)
     {
-        try { return new Uri(url).Host.Replace("www.", ""); }
+        try
+        {
+            string host = new Uri(url).Host;
+            return host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? host[4..] : host;
+        }
         catch { return "New tab"; }
     }
 
@@ -1808,7 +1857,8 @@ public partial class MainWindow : Window
             (uri.Scheme == "http" || uri.Scheme == "https"))
             return uri.ToString();
 
-        if (!value.Contains(' ') && value.Contains('.'))
+        if (!value.Contains(' ') && value.Contains('.') &&
+            Uri.TryCreate("https://" + value, UriKind.Absolute, out _))
             return "https://" + value;
 
         string search = SearchTemplate();
@@ -1820,7 +1870,6 @@ public partial class MainWindow : Window
         "Bing" => "https://www.bing.com/search?q={query}",
         "DuckDuckGo" => "https://duckduckgo.com/?q={query}",
         "Brave" => "https://search.brave.com/search?q={query}",
-        "Custom" => string.IsNullOrWhiteSpace(preferences.SearchUrl) ? "https://www.google.com/search?q={query}" : preferences.SearchUrl,
         _ => "https://www.google.com/search?q={query}"
     };
 
@@ -1835,27 +1884,30 @@ public partial class MainWindow : Window
     {
         SearchEngineBox.Style = (Style)FindResource("SearchEnginePicker");
         SearchEngineBox.Width = 48;
-        SearchEngineBox.Height = 26;
         SearchEngineBox.Padding = new Thickness(0);
         SearchEngineBox.HorizontalContentAlignment = HorizontalAlignment.Center;
         SearchEngineBox.VerticalContentAlignment = VerticalAlignment.Center;
         SearchEngineBox.ToolTip = "Choose search engine";
+
         SearchEngineBox.Items.Clear();
-        foreach (string engine in new[] { "Google", "Bing", "DuckDuckGo", "Brave", "Custom" })
-            SearchEngineBox.Items.Add(new ComboBoxItem { Content = SearchEngineIcon(engine), Tag = engine, ToolTip = engine, Width = 44, Height = 24, Padding = new Thickness(0), HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center });
+
+        foreach (string engine in new[] { "Google", "Bing", "DuckDuckGo", "Brave" })
+        {
+            SearchEngineBox.Items.Add(new ComboBoxItem
+            {
+                Content = SearchEngineIcon(engine),
+                Tag = engine,
+                ToolTip = engine,
+                Width = 44,
+                Padding = new Thickness(0),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center
+            });
+        }
     }
 
     static FrameworkElement SearchEngineIcon(string engine)
     {
-        if (engine == "Custom")
-        {
-            var customIcon = new Grid { Width = 20, Height = 20, ToolTip = engine };
-            customIcon.Children.Add(new Path { Data = Geometry.Parse("M 3,5 L 17,5 M 3,10 L 17,10 M 3,15 L 17,15"), Stroke = new SolidColorBrush(Color.FromRgb(151, 126, 235)), StrokeThickness = 1.8, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round });
-            customIcon.Children.Add(new Ellipse { Width = 5, Height = 5, Fill = new SolidColorBrush(Color.FromRgb(151, 126, 235)), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(6, 0, 0, 10) });
-            customIcon.Children.Add(new Ellipse { Width = 5, Height = 5, Fill = new SolidColorBrush(Color.FromRgb(151, 126, 235)), HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 4, 0) });
-            return customIcon;
-        }
-
         // Use each provider's real favicon so the menu shows the actual brand mark.
         // The favicon endpoint returns a cached 64px PNG, suitable for the compact picker.
         string domain = engine switch
@@ -2119,7 +2171,7 @@ public partial class MainWindow : Window
                     catch (Exception ex) { MessageBox.Show("Could not remove the extension: " + ex.Message, "Tryxtor Extensions"); }
                 };
                 DockPanel.SetDock(remove, Dock.Right); row.Children.Add(remove);
-                var enabled = new CheckBox { Content = extension.Name, IsChecked = extension.IsEnabled, Tag = extension, Foreground = ink, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 8, 5, 8), FontWeight = FontWeights.SemiBold };
+                var enabled = new CheckBox { Content = extension.Name, IsChecked = extension.IsEnabled, Foreground = ink, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 8, 5, 8), FontWeight = FontWeights.SemiBold };
                 enabled.Checked += async (_, _) => await SetExtensionEnabled(extension, true);
                 enabled.Unchecked += async (_, _) => await SetExtensionEnabled(extension, false);
                 row.Children.Add(enabled);
@@ -2207,7 +2259,7 @@ public partial class MainWindow : Window
         void Add(string title, string detail, string value, bool isSearch = false, bool isRecentSearch = false)
         {
             if (results.Count >= 8 || !seen.Add((isSearch ? "search:" : "link:") + value)) return;
-            results.Add(new AddressSuggestion { Title = title, Detail = detail, Value = value, IsSearch = isSearch, IsRecentSearch = isRecentSearch });
+            results.Add(new AddressSuggestion { Title = title, Detail = detail, Value = value, IsRecentSearch = isRecentSearch });
         }
         if (!privateMode)
             foreach (string recent in preferences.RecentSearches)
@@ -2469,7 +2521,6 @@ public partial class MainWindow : Window
             Color color = ParseColor(hex.Text);
             PlaceWheelMarker(color);
             var selectedAccent = new SolidColorBrush(color);
-            UpdateThemeSelection();
             SetDensityChoiceState(compactChoice, selectedDensity == "Compact", selectedAccent, outline);
             SetDensityChoiceState(balancedChoice, selectedDensity == "Balanced", selectedAccent, outline);
             SetDensityChoiceState(roomyChoice, selectedDensity == "Roomy", selectedAccent, outline);
@@ -2478,14 +2529,13 @@ public partial class MainWindow : Window
         foreach (string color in new[] { "#B6F36A", "#83C9FF", "#C2A0FF", "#FF9E80", "#FFCF70", "#FF80AA", "#66DBC7" })
         {
             var swatch = new Button { Content = " ", Width = 27, Height = 27, Margin = new Thickness(4), Background = ParseBrush(color, Brushes.White), BorderThickness = new Thickness(0), ToolTip = color };
-            swatch.Click += (_, _) => { hex.Text = color; PlaceWheelMarker(ParseColor(color)); };
+            swatch.Click += (_, _) => hex.Text = color;
             swatches.Children.Add(swatch);
         }
         var bookmarkCheck = new CheckBox { Content = "Show bookmarks bar", IsChecked = preferences.ShowBookmarks, Foreground = ink, Margin = new Thickness(0, 0, 0, 3) };
         var shortcutCheck = new CheckBox { Content = "Show shortcuts on start page", IsChecked = preferences.ShowShortcuts, Foreground = ink, Margin = new Thickness(0, 0, 0, 3) };
         var suggestionCheck = new CheckBox { Content = "Show address suggestions while typing", IsChecked = preferences.ShowSuggestions, Foreground = ink, Margin = new Thickness(0, 0, 0, 3) };
         var home = new TextBox { Text = preferences.HomePage, Padding = new Thickness(9), Background = field, Foreground = ink, BorderBrush = outline };
-        var search = new TextBox { Text = preferences.SearchUrl, Padding = new Thickness(9), Background = field, Foreground = ink, BorderBrush = outline };
         string selectedBackgroundPath = preferences.StartPageBackground;
         var backgroundStatus = new TextBlock { Text = string.IsNullOrWhiteSpace(selectedBackgroundPath) ? "No background image" : System.IO.Path.GetFileName(selectedBackgroundPath), Foreground = muted, FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
         var chooseBackground = new Button { Content = "Choose image…", Padding = new Thickness(11, 7, 11, 7), Foreground = ink, Background = field, BorderBrush = outline, BorderThickness = new Thickness(1), Cursor = Cursors.Hand };
@@ -2536,9 +2586,7 @@ public partial class MainWindow : Window
                 SettingLabel("BACKGROUND IMAGE", muted),
                 backgroundControls,
                 SettingLabel("Homepage (blank uses Tryxtor start page)", muted),
-                home,
-                SettingLabel("Search URL template (include {query})", muted),
-                search
+                home
             }, card, outline, ink, muted));
 
         var savedLinksPanel = new StackPanel();
@@ -2840,7 +2888,7 @@ public partial class MainWindow : Window
             Height = 38,
             Padding = new Thickness(14, 0, 14, 0),
             Background = accent,
-            Foreground = Brushes.White,
+            Foreground = light ? Brushes.White : Brushes.Black,
             BorderThickness = new Thickness(0),
             Cursor = Cursors.Hand
         };
@@ -2881,6 +2929,7 @@ public partial class MainWindow : Window
         {
             if (passwordVault.IsUnlocked)
             {
+                vaultStatus.Text = "Vault is unlocked.";
                 unlockButton.IsEnabled = false;
                 unlockButton.Visibility = Visibility.Collapsed;
                 lockButton.Visibility = Visibility.Visible;
@@ -2985,7 +3034,6 @@ public partial class MainWindow : Window
                     try
                     {
                         passwordVault.DeleteEntry(entry.Id);
-                        RefreshPasswordList();
                         UpdateVaultInterface();
                     }
                     catch (Exception ex)
@@ -3196,7 +3244,6 @@ public partial class MainWindow : Window
                         Notes = notesBox.Text.Trim()
                     });
 
-                    RefreshPasswordList();
                     UpdateVaultInterface();
                     entryDialog.Close();
                 }
@@ -3378,7 +3425,6 @@ public partial class MainWindow : Window
                         CreatedAt = entry.CreatedAt
                     });
 
-                    RefreshPasswordList();
                     UpdateVaultInterface();
                     editDialog.Close();
                 }
@@ -3595,13 +3641,6 @@ public partial class MainWindow : Window
                 catch (Exception ex) { MessageBox.Show("Could not save the background image: " + ex.Message, "Settings"); return; }
             }
             else preferences.StartPageBackground = "";
-            string newSearchUrl = string.IsNullOrWhiteSpace(search.Text) ? "https://www.google.com/search?q={query}" : search.Text.Trim();
-            if (!string.Equals(newSearchUrl, preferences.SearchUrl, StringComparison.Ordinal))
-            {
-                preferences.SearchUrl = newSearchUrl;
-                preferences.SearchEngine = "Custom";
-                SearchEngineBox.SelectedItem = SearchEngineBox.Items.OfType<ComboBoxItem>().First(x => x.Tag?.ToString() == "Custom");
-            }
             SavePreferences(); ApplyAppearance(); RenderBookmarks(); RenderShortcuts(); savedStatus.Text = "Changes saved";
         };
         footer.Children.Add(savedStatus); footer.Children.Add(cancel); footer.Children.Add(save); Grid.SetRow(footer, 2); layout.Children.Add(footer);
@@ -3630,29 +3669,6 @@ public partial class MainWindow : Window
         if (button.Tag is Border frame)
         {
             frame.BorderBrush = selected ? accent : outline;
-            frame.BorderThickness = new Thickness(selected ? 2 : 1);
-        }
-    }
-
-    Button MakeThemeChoice(string title, bool light, bool selected)
-    {
-        Color previewBg = light ? Color.FromRgb(245, 247, 250) : Color.FromRgb(17, 20, 27);
-        Color previewBar = light ? Colors.White : Color.FromRgb(33, 39, 49);
-        Brush previewInk = new SolidColorBrush(light ? Color.FromRgb(38, 48, 63) : Color.FromRgb(235, 239, 245));
-        var sample = new StackPanel();
-        sample.Children.Add(new Border { Height = 14, CornerRadius = new CornerRadius(5, 5, 0, 0), Background = new SolidColorBrush(previewBar), Child = new TextBlock { Text = "TRIXTER     tab     tab", FontSize = 7, Foreground = previewInk, Margin = new Thickness(7, 1, 0, 0) } });
-        sample.Children.Add(new Border { Height = 37, CornerRadius = new CornerRadius(0, 0, 5, 5), Background = new SolidColorBrush(previewBg), Padding = new Thickness(7), Child = new Border { Background = light ? Brushes.White : new SolidColorBrush(Color.FromRgb(37, 44, 55)), CornerRadius = new CornerRadius(4), BorderBrush = light ? new SolidColorBrush(Color.FromRgb(205, 213, 223)) : new SolidColorBrush(Color.FromRgb(61, 72, 87)), BorderThickness = new Thickness(1) } });
-        sample.Children.Add(new TextBlock { Text = title, FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = previewInk, Margin = new Thickness(1, 8, 0, 0) });
-        sample.Children.Add(new TextBlock { Text = light ? "Bright and crisp" : "Soft and focused", FontSize = 10, Foreground = previewInk, Opacity = .75 });
-        var frame = new Border { Child = sample, Background = light ? Brushes.White : new SolidColorBrush(Color.FromRgb(27, 32, 41)), BorderBrush = selected ? ParseBrush(preferences.Accent, Brushes.LightGreen) : new SolidColorBrush(Color.FromRgb(72, 82, 96)), BorderThickness = new Thickness(selected ? 2 : 1), CornerRadius = new CornerRadius(10), Padding = new Thickness(9) };
-        return new Button { Content = frame, Tag = frame, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0), Margin = new Thickness(0), Cursor = Cursors.Hand, ToolTip = title + " theme" };
-    }
-
-    static void SetThemeChoiceState(Button button, bool selected, Brush accent)
-    {
-        if (button.Tag is Border frame)
-        {
-            frame.BorderBrush = selected ? accent : new SolidColorBrush(Color.FromRgb(72, 82, 96));
             frame.BorderThickness = new Thickness(selected ? 2 : 1);
         }
     }
