@@ -23,7 +23,7 @@ public partial class MainWindow
         {
             CornerRadius = new CornerRadius(8, 8, 0, 0),
             Background = new SolidColorBrush(Color.FromRgb(32, 35, 43)),
-            Margin = new Thickness(2, 5, 2, 0),
+            Margin = new Thickness(2, TabTopGap, 2, 0),
             BorderThickness = new Thickness(0, 0, 0, 2)
         };
 
@@ -81,6 +81,15 @@ public partial class MainWindow
         tab.Surface.Child = header;
     }
 
+    // Tabs float 5px below the top edge, except when maximized: then they reach the very top of the
+    // screen so you can throw the mouse up there and still hit a tab (Fitts's law).
+    double TabTopGap => WindowState == WindowState.Maximized ? 0 : 5;
+
+    void UpdateTabTopGap()
+    {
+        foreach (var tab in tabs) tab.Surface.Margin = new Thickness(2, TabTopGap, 2, 0);
+    }
+
     void UpdateTabStripLayout()
     {
         TabStrip.Rows = 1;
@@ -112,10 +121,12 @@ public partial class MainWindow
                 tab.Owner.passwordAccountPopup = null;
             }
             tab.Url = e.Uri;
+            tab.Owner.SetTabLoading(tab, true);
             if (tab == tab.Owner.activeTab) tab.Owner.SetAddressText(e.Uri);
         };
         tab.View.NavigationCompleted += (_, _) =>
         {
+            tab.Owner.SetTabLoading(tab, false);
             string? documentTitle = tab.View.CoreWebView2?.DocumentTitle;
             tab.Title = string.IsNullOrWhiteSpace(documentTitle) ? Host(tab.Url) : documentTitle;
             tab.TitleButton.Content = tab.Title;
@@ -138,6 +149,12 @@ public partial class MainWindow
             {
                 CoreWebView2 core = tab.View.CoreWebView2;
                 core.DownloadStarting += (_, download) => tab.Owner.TrackDownload(download);
+                _ = core.AddScriptToExecuteOnDocumentCreatedAsync(PagePersistenceScript);
+                _ = core.AddScriptToExecuteOnDocumentCreatedAsync(FullScreenKeyScript);
+                core.ContainsFullScreenElementChanged += (_, _) =>
+                {
+                    if (tab == tab.Owner.activeTab) tab.Owner.SyncFullScreen();
+                };
                 core.WebMessageReceived += (_, message) =>
                 {
                     string receivedMessage;
@@ -153,6 +170,11 @@ public partial class MainWindow
 
                     else if (receivedMessage == "trixter:history")
                         owner.History_Click(owner, new RoutedEventArgs());
+
+                    else if (receivedMessage == "trixter:toggle-fullscreen:" + fullScreenNonce)
+                    {
+                        if (tab == owner.activeTab) owner.ToggleBrowserFullScreen();
+                    }
 
                     else if (receivedMessage.StartsWith("trixter:password-submitted:") && !owner.privateMode)
                     {
@@ -589,6 +611,8 @@ public partial class MainWindow
         }
         SetAddressText(tab.Url);
         UpdateBookmarkButton();
+        UpdateLoadingIndicator();
+        SyncFullScreen();
         NewTabPanel.Visibility = string.IsNullOrEmpty(tab.Url) ? Visibility.Visible : Visibility.Collapsed;
         BrowserHost.Visibility = string.IsNullOrEmpty(tab.Url) ? Visibility.Collapsed : Visibility.Visible;
         if (string.IsNullOrEmpty(tab.Url))

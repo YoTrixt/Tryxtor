@@ -87,6 +87,48 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Window buttons: full height and flush with the top and right screen edges, so they can be hit by
+       throwing the mouse into the corner when the window is maximized. BorderBrush carries the hover color. -->
+        <Style TargetType="Button" x:Key="CaptionButton" BasedOn="{StaticResource ChromeButton}">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource HoverSurface}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Background="Transparent">
+                            <Border x:Name="Hover" Background="{TemplateBinding BorderBrush}" Opacity="0"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Hover" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.16"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Hover" Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="Button" x:Key="CaptionCloseButton" BasedOn="{StaticResource CaptionButton}">
+            <Setter Property="BorderBrush" Value="#C42B1C"/>
+        </Style>
         <Style TargetType="Button" x:Key="TabTitleButton"
        BasedOn="{StaticResource ChromeButton}">
 
@@ -135,14 +177,14 @@
         </Grid.RowDefinitions>
         <Border x:Name="TitleBar" Grid.Row="0" Background="#171A21" BorderBrush="#292D36" BorderThickness="0,0,0,1" shell:WindowChrome.IsHitTestVisibleInChrome="True" PreviewMouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,0,0">
-                    <Button ToolTip="Minimize" Style="{StaticResource ChromeButton}" Click="Minimize_Click">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Stretch" Margin="0">
+                    <Button ToolTip="Minimize" Style="{StaticResource CaptionButton}" Click="Minimize_Click">
                         <Path Data="M 3,10 L 15,10" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.7" Width="18" Height="18"/>
                     </Button>
-                    <Button x:Name="MaximizeButton" ToolTip="Maximize or restore" Style="{StaticResource ChromeButton}" Click="Maximize_Click">
+                    <Button x:Name="MaximizeButton" ToolTip="Maximize or restore" Style="{StaticResource CaptionButton}" Click="Maximize_Click">
                         <Path x:Name="MaximizeIcon" Data="M 3,3 L 15,3 L 15,15 L 3,15 Z" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" Width="18" Height="18"/>
                     </Button>
-                    <Button ToolTip="Close Tryxtor" Style="{StaticResource ChromeButton}" Click="Close_Click">
+                    <Button ToolTip="Close Tryxtor" Style="{StaticResource CaptionCloseButton}" Click="Close_Click">
                         <Path Data="M 4,4 L 14,14 M 14,4 L 4,14" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18"/>
                     </Button>
                 </StackPanel>
@@ -153,7 +195,7 @@
                 </Grid>
             </DockPanel>
         </Border>
-        <Grid x:Name="Toolbar" Grid.Row="1" Background="#171A21" Margin="0,0,0,1">
+        <Grid x:Name="Toolbar" Grid.Row="1" UseLayoutRounding="True" Background="#171A21" Margin="0,0,0,1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -166,22 +208,37 @@
                 <Button ToolTip="Forward" Style="{StaticResource ChromeButton}" Click="Forward_Click">
                     <Path Data="M 5,4 L 13,9 L 5,14" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="20" Height="20"/>
                 </Button>
-                <Button ToolTip="Reload" Style="{StaticResource ChromeButton}" Click="Reload_Click">
-                    <Path Data="M 16,7 A 6,6 0 1 0 16,12 M 16,7 L 16,3 M 16,7 L 12,7" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="20" Height="20"/>
+                <Button x:Name="ReloadButton" ToolTip="Reload" Style="{StaticResource ChromeButton}" Click="Reload_Click">
+                    <Path Data="M 16,7 A 6,6 0 1 0 16,12 M 16,7 L 16,3 M 16,7 L 12,7" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="20" Height="20" RenderTransformOrigin="0.5275,0.475">
+                        <Path.RenderTransform>
+                            <RotateTransform x:Name="ReloadRotation" Angle="0"/>
+                        </Path.RenderTransform>
+                    </Path>
                 </Button>
             </StackPanel>
-            <Border x:Name="AddressSurface" Grid.Column="1" Background="#101319" CornerRadius="9" Margin="8,6" BorderBrush="#303540" BorderThickness="1">
+            <Border x:Name="AddressSurface" Grid.Column="1" VerticalAlignment="Center" UseLayoutRounding="True" SnapsToDevicePixels="True" Background="#101319" CornerRadius="9" Margin="8,6" BorderBrush="#303540" BorderThickness="1">
                 <DockPanel>
-                    <Button x:Name="StarButton" ToolTip="Bookmark current page" Style="{StaticResource ChromeButton}" DockPanel.Dock="Right" Click="Bookmark_Click">
+                    <Button x:Name="StarButton" ToolTip="Bookmark current page" Style="{StaticResource ChromeButton}" DockPanel.Dock="Right" Click="Bookmark_Click" Padding="0" Margin="0,0,4,0" VerticalAlignment="Center">
                         <Path Data="M 10,1 L 12.5,7 L 19,7.5 L 14,12 L 15.5,19 L 10,15.5 L 4.5,19 L 6,12 L 1,7.5 L 7.5,7 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
                     </Button>
-                    <ComboBox x:Name="SearchEngineBox" Margin="0,0,7,0" Background="#202630" Foreground="#E8EBF0" BorderBrush="#46505E" SelectionChanged="SearchEngine_SelectionChanged"></ComboBox>
+                    <ComboBox x:Name="SearchEngineBox" Margin="4,0,7,0" VerticalAlignment="Center" Background="#202630" Foreground="#E8EBF0" BorderBrush="#46505E" SelectionChanged="SearchEngine_SelectionChanged"></ComboBox>
                     <TextBox x:Name="AddressBox" Background="Transparent" Foreground="#F0F1F4" BorderThickness="0" VerticalContentAlignment="Center" FontSize="13" TextChanged="AddressBox_TextChanged" PreviewKeyDown="AddressBox_KeyDown"/>
                 </DockPanel>
             </Border>
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="4,0,12,0">
                 <Button x:Name="DownloadsButton" ToolTip="Downloads (Ctrl+J)" Style="{StaticResource ChromeButton}" Click="Downloads_Click">
-                    <Path Data="M 10,3 L 10,12 M 6,8.5 L 10,12.5 L 14,8.5 M 4,16.5 L 16,16.5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="20" Height="20"/>
+                    <Grid Width="20" Height="20" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="DownloadsPop" ScaleX="1" ScaleY="1"/>
+                        </Grid.RenderTransform>
+                        <Path Data="M 10,3 L 10,12 M 6,8.5 L 10,12.5 L 14,8.5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round">
+                            <Path.RenderTransform>
+                                <TranslateTransform x:Name="DownloadsArrowShift" Y="0"/>
+                            </Path.RenderTransform>
+                        </Path>
+                        <Path Data="M 4,16.5 L 16,16.5" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                        <Border x:Name="DownloadsProgress" Height="2" Width="0" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4,0,0,0" CornerRadius="1" Background="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Opacity="0"/>
+                    </Grid>
                 </Button>
                 <Button ToolTip="Extensions" Style="{StaticResource ChromeButton}" Click="Extensions_Click">
                     <Path Data="M 2,2 L 7,2 C 6,5 10,5 9,2 L 14,2 L 14,7 C 17,6 17,10 14,9 L 14,14 L 9,14 C 10,11 6,11 7,14 L 2,14 L 2,9 C 5,10 5,6 2,7 Z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="18" Height="18"/>
@@ -196,6 +253,13 @@
                     </Grid>
                 </Button>
             </StackPanel>
+        </Grid>
+        <Grid x:Name="LoadingStrip" Grid.Row="1" Height="2" VerticalAlignment="Bottom" Margin="0,0,0,1" IsHitTestVisible="False" ClipToBounds="True" Opacity="0">
+            <Border x:Name="LoadingBar" Width="220" HorizontalAlignment="Left" CornerRadius="1" Background="{DynamicResource ThemeAccent}">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="LoadingBarShift" X="-220"/>
+                </Border.RenderTransform>
+            </Border>
         </Grid>
         <DockPanel Grid.Row="2" Background="#171A21" x:Name="BookmarkBar" LastChildFill="False"/>
         <Grid Grid.Row="3" x:Name="Body">
@@ -234,7 +298,7 @@
                                 </StackPanel>
                                 <Button Grid.Column="1" Content="x" Tag="{Binding}" ToolTip="Remove recent search" Padding="8,3" Background="Transparent" Foreground="#C4CBD5" BorderThickness="0" Click="RemoveRecentSearch_Click">
                                     <Button.Style>
-                                        <Style TargetType="Button">
+                                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                                             <Setter Property="Visibility" Value="Collapsed"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsRecentSearch}" Value="True">

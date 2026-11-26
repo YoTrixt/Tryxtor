@@ -191,10 +191,11 @@ public partial class MainWindow
 
     void Forward_Click(object sender, RoutedEventArgs e) { if (activeTab?.View.CoreWebView2?.CanGoForward == true) activeTab.View.CoreWebView2.GoForward(); }
 
-    void Reload_Click(object sender, RoutedEventArgs e)
+    async void Reload_Click(object sender, RoutedEventArgs e)
     {
-        if (activeTab == null) return;
-        if (string.IsNullOrWhiteSpace(activeTab.Url))
+        var tab = activeTab;
+        if (tab == null) return;
+        if (string.IsNullOrWhiteSpace(tab.Url))
         {
             SuggestionPopup.IsOpen = false;
             SetAddressText("");
@@ -205,7 +206,20 @@ public partial class MainWindow
             BrowserHost.Visibility = Visibility.Collapsed;
             return;
         }
-        activeTab.View.CoreWebView2?.Reload();
+
+        var core = tab.View.CoreWebView2;
+        if (core == null) return;
+
+        // Let the page write down its scroll position and typed input first, so it can put
+        // them back after the reload. The short timeout keeps a frozen page from blocking Reload.
+        try
+        {
+            var saved = core.ExecuteScriptAsync("window.__tryxtorSaveState && window.__tryxtorSaveState()");
+            await Task.WhenAny(saved, Task.Delay(400));
+        }
+        catch (Exception) { }
+
+        tab.View.CoreWebView2?.Reload();
     }
 
     void AddressBox_TextChanged(object sender, TextChangedEventArgs e)

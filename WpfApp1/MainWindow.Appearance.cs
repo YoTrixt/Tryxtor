@@ -74,6 +74,7 @@ public partial class MainWindow
 
         Resources["HoverSurface"] = new SolidColorBrush(
             Blend(surface, inset, .5));
+        UpdateThemeResources(theme);
         // Apply the selected theme to the browser chrome
         TitleBar.Background = new SolidColorBrush(surface);
         Toolbar.Background = new SolidColorBrush(surface);
@@ -99,10 +100,7 @@ public partial class MainWindow
         SearchEngineBox.Foreground = text;
         SearchEngineBox.Background = new SolidColorBrush(inset);
         SearchEngineBox.BorderBrush = new SolidColorBrush(outline);
-        var engineItems = new Style(typeof(ComboBoxItem));
-        engineItems.Setters.Add(new Setter(Control.ForegroundProperty, text));
-        engineItems.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(surface)));
-        SearchEngineBox.ItemContainerStyle = engineItems;
+        SearchEngineBox.ItemContainerStyle = (Style)Application.Current.FindResource("ThemedComboBoxItem");
         HomeHeading.Foreground = AddressBox.Foreground = HomeSearch.Foreground = text;
         StarButton.Foreground = accent;
         HomeSubtitle.Foreground = QuickLinksLabel.Foreground = muted;
@@ -113,12 +111,17 @@ public partial class MainWindow
 
         rootGrid.RowDefinitions[0].Height = new GridLength(preferences.Density == "Compact" ? 36 : preferences.Density == "Roomy" ? 50 : 42);
         rootGrid.RowDefinitions[1].Height = new GridLength(preferences.Density == "Compact" ? 42 : preferences.Density == "Roomy" ? 56 : 48);
+        // The picker and star have to fit inside the address bar border (3px of room above and below),
+        // otherwise the picker's outline gets clipped at the bottom.
         double pickerHeight = preferences.Density switch
         {
-            "Compact" => 28,
-            "Roomy" => 42,
-            _ => 34
+            "Compact" => 24,
+            "Roomy" => 34,
+            _ => 28
         };
+        AddressSurface.Height = pickerHeight + 8;
+        StarButton.Width = StarButton.Height = pickerHeight;
+        StarButton.VerticalAlignment = VerticalAlignment.Center;
 
         SearchEngineBox.Height = pickerHeight;
         SearchEngineBox.VerticalAlignment = VerticalAlignment.Center;
@@ -136,7 +139,6 @@ public partial class MainWindow
                 icon.HorizontalAlignment = HorizontalAlignment.Center;
             }
         }
-        StarButton.Padding = preferences.Density == "Compact" ? new Thickness(3, 0, 3, 0) : new Thickness(8, 4, 8, 4);
         foreach (var tab in tabs)
         {
             tab.TitleButton.Foreground = text;

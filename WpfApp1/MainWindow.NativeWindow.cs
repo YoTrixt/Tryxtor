@@ -67,7 +67,7 @@ public partial class MainWindow
 
     IntPtr WindowMessageHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (WindowState == WindowState.Maximized)
+        if (WindowState == WindowState.Maximized && !isFullScreen)
         {
             if (message == WmNcHitTest)
             {
@@ -129,10 +129,12 @@ public partial class MainWindow
         if (workAreaMonitor == IntPtr.Zero || !GetMonitorInfo(workAreaMonitor, ref workAreaInfo)) return IntPtr.Zero;
 
         var limits = Marshal.PtrToStructure<NativeMinMaxInfo>(lParam);
-        limits.MaxPosition.X = workAreaInfo.Work.Left - workAreaInfo.Monitor.Left;
-        limits.MaxPosition.Y = workAreaInfo.Work.Top - workAreaInfo.Monitor.Top;
-        limits.MaxSize.X = workAreaInfo.Work.Right - workAreaInfo.Work.Left;
-        limits.MaxSize.Y = workAreaInfo.Work.Bottom - workAreaInfo.Work.Top;
+        // Normally maximize to the work area (keeps the taskbar visible); in full screen use the whole monitor.
+        var area = isFullScreen ? workAreaInfo.Monitor : workAreaInfo.Work;
+        limits.MaxPosition.X = area.Left - workAreaInfo.Monitor.Left;
+        limits.MaxPosition.Y = area.Top - workAreaInfo.Monitor.Top;
+        limits.MaxSize.X = area.Right - area.Left;
+        limits.MaxSize.Y = area.Bottom - area.Top;
         var dpiForLimits = VisualTreeHelper.GetDpi(this);
         limits.MinTrackSize.X = (int)Math.Ceiling(MinWidth * dpiForLimits.DpiScaleX);
         limits.MinTrackSize.Y = (int)Math.Ceiling(MinHeight * dpiForLimits.DpiScaleY);

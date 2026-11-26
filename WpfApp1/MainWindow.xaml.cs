@@ -67,6 +67,7 @@ public partial class MainWindow : Window
     MainWindow(bool privateMode, string? initialAddress, bool emptyWindow = false,
         CoreWebView2Environment? sharedPrivateEnvironment = null, string? sharedPrivateProfilePath = null)
     {
+        EnsureThemeDictionary();   // themed control styles must exist before the XAML is parsed
         InitializeComponent();
         AddressBox.GotKeyboardFocus += AddressBox_GotKeyboardFocus;
         AddressBox.LostKeyboardFocus += AddressBox_LostKeyboardFocus;
@@ -102,11 +103,8 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) => HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowMessageHook);
         StateChanged += (_, _) =>
         {
-            var chrome = WindowChrome.GetWindowChrome(this);
-            if (chrome != null)
-                chrome.ResizeBorderThickness = WindowState == WindowState.Maximized
-                    ? new Thickness(10, 0, 10, 10)
-                    : new Thickness(10);
+            UpdateResizeBorder();
+            UpdateTabTopGap();
             if (MaximizeIcon != null)
                 MaximizeIcon.Data = WindowState == WindowState.Maximized
                     ? Geometry.Parse("M 5,5 L 16,5 L 16,16 L 5,16 Z M 2,12 L 2,2 L 12,2")
@@ -286,6 +284,7 @@ public partial class MainWindow : Window
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.W && activeTab != null) { e.Handled = true; CloseTab(activeTab); }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.L) { e.Handled = true; AddressBox.Focus(); AddressBox.SelectAll(); }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.R) { e.Handled = true; Reload_Click(sender, new RoutedEventArgs()); }
+        else if (e.Key == Key.F11 && Keyboard.Modifiers == ModifierKeys.None) { e.Handled = true; ToggleBrowserFullScreen(); }
         else if (e.Key == Key.Escape) Keyboard.ClearFocus();
     }
 }

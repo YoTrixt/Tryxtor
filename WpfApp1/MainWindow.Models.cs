@@ -29,6 +29,7 @@ public partial class MainWindow
         public string? PendingLoginUsername;
         public string? PendingLoginPassword;
         public int LoginAttemptId;
+        public bool IsLoading;
     }
 
     sealed class Shortcut

@@ -31,6 +31,7 @@ public partial class MainWindow
         public string? Error;
         public DateTime Started = DateTime.Now;
         public bool Incognito;
+        public bool Restored;   // loaded from disk, not downloaded in this session
         public double BytesPerSecond;
         public DateTime LastSampleTime = DateTime.UtcNow;
         public long LastSampleBytes;
@@ -87,7 +88,8 @@ public partial class MainWindow
                     TotalBytes = record.Size > 0 ? record.Size : null,
                     Status = status,
                     Error = error,
-                    Started = record.Started
+                    Started = record.Started,
+                    Restored = true
                 });
             }
         }
@@ -197,15 +199,6 @@ public partial class MainWindow
         downloadItems.Insert(0, item);
         DownloadsListChanged?.Invoke();
         DownloadsActivity?.Invoke();
-    }
-
-    void UpdateDownloadsIndicator()
-    {
-        bool active = downloadItems.Any(d => (!d.Incognito || privateMode) && d.Status == DownloadStatus.Downloading);
-        var theme = BuiltInThemes.TryGetValue(preferences.ColorTheme, out var selected) ? selected : BuiltInThemes["Midnight"];
-        DownloadsButton.Foreground = active
-            ? ParseBrush(preferences.Accent, Brushes.LightGreen)
-            : ParseBrush(theme.Text, Brushes.White);
     }
 
     void Downloads_Click(object sender, RoutedEventArgs e)
